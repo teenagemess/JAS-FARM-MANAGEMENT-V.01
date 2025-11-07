@@ -15,6 +15,17 @@ class UpdateSheepRequest extends FormRequest
         return true; // Izinkan (bisa diubah jika pakai role)
     }
 
+        protected function prepareForValidation()
+    {
+        if ($this->tag_number) {
+            $this->merge([
+                // Ubah input 'tag_number' (misal: "123")
+                // menjadi format lengkap (misal: "JAS-123")
+                'tag_number' => 'JAS-' . $this->tag_number,
+            ]);
+        }
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *

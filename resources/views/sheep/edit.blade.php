@@ -36,7 +36,7 @@
                                     <span class="inline-flex items-center px-3 text-gray-500 border border-r-0 border-gray-300 rounded-l-md bg-gray-50 sm:text-sm">
                                         JAS-
                                     </span>
-                                    <x-text-input id="tag_number" class="flex-1 block w-full rounded-none rounded-r-md" type="text" name="tag_number" :value="old('tag_number', $tagSuffix)" required autofocus placeholder="001" />
+                                    <x-text-input id="tag_number" class="flex-1 block w-full rounded-none rounded-r-md" type="number" name="tag_number" :value="old('tag_number', $tagSuffix)" required autofocus placeholder="001" />
                                 </div>
                             </div>
 
