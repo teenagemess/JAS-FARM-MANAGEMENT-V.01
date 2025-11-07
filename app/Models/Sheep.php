@@ -34,6 +34,11 @@ class Sheep extends Model
         'description',
     ];
 
+        protected $casts = [
+        'date_of_birth' => 'datetime',
+        'is_pedigree' => 'boolean',
+    ];
+
     // --- RELASI SILSILAH (SELF-REFERENCING) ---
 
     /**
