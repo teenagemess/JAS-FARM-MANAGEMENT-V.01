@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="text-xl font-semibold leading-tight text-gray-800">
-            {{ __('Tambah Data Domba Baru') }}
+            {{ __('Buat Kandang Baru') }}
         </h2>
     </x-slot>
 
@@ -21,9 +21,12 @@
                         </div>
                     @endif
 
-                    <form method="POST" action="{{ route('sheep.store') }}" enctype="multipart/form-data">
+                    <form method="POST" action="{{ route('shelters.store') }}">
                         @csrf
-                        @include('sheep._form')
+
+                        {{-- Memanggil Partial Form --}}
+                        @include('shelters._form')
+
                     </form>
 
                 </div>

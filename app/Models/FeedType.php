@@ -10,15 +10,15 @@ class FeedType extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'unit', 'notes'];
+    protected $fillable = ['name', 'unit', 'description', 'price_per_unit'];
 
     /**
-     * Relasi: Satu Jenis Pakan diberikan dalam banyak Catatan Pakan.
+     * Relasi ke FeedingRecord (Many-to-Many)
      */
     public function feedingRecords(): BelongsToMany
     {
-        // Pivot table yang akan digunakan: 'feeding_record_feed_type'
         return $this->belongsToMany(FeedingRecord::class, 'feeding_record_feed_type')
-                    ->withPivot('quantity'); // WAJIB ada 'withPivot' untuk kolom jumlah
+                    ->withPivot(['quantity_morning', 'quantity_evening'])
+                    ->withTimestamps();
     }
 }

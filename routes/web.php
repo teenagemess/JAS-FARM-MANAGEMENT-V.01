@@ -3,6 +3,13 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SheepController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ShelterController;
+use App\Http\Controllers\SymptomController;
+use App\Http\Controllers\FeedTypeController;
+use App\Http\Controllers\HealthRecordController;
+use App\Http\Controllers\WeightRecordController;
+use App\Http\Controllers\FeedingRecordController;
+use App\Http\Controllers\ReproductionRecordController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -16,14 +23,34 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    //Sheep
+    Route::resource('sheep', SheepController::class);
 
-    Route::get('/sheep', [SheepController::class, 'index'])->name('sheep.index');
+    //Shelter
+    Route::resource('shelters', ShelterController::class)->except(['show']);
+    Route::get('/shelters/{shelter}/capacity', [ShelterController::class, 'getCapacity'])->name('shelters.capacity');
 
-    Route::get('/sheep/create', [SheepController::class, 'create'])->name('sheep.create');
-    Route::post('/sheep', [SheepController::class, 'store'])->name('sheep.store');
-    Route::get('/sheep/{sheep}', [SheepController::class, 'show'])->name('sheep.show');
-    Route::get('/sheep/{sheep}/edit', [SheepController::class, 'edit'])->name('sheep.edit');
-    Route::put('/sheep/{sheep}', [SheepController::class, 'update'])->name('sheep.update');
+    //Weight Records
+    Route::resource('sheep.weights', WeightRecordController::class)
+    ->shallow()
+    ->only(['create', 'store', 'destroy']);
+
+    //Symptoms
+    Route::resource('symptoms', SymptomController::class)->except(['show']);
+
+    //Health Records
+    Route::resource('sheep.health-records', HealthRecordController::class)
+    ->shallow()
+    ->only(['create', 'store', 'destroy']);
+
+    //Reproduction Records
+    Route::resource('sheep.reproduction-records', ReproductionRecordController::class)
+        ->shallow()
+        ->only(['create', 'store', 'destroy', 'edit', 'update']);
+
+    Route::resource('feed-types', FeedTypeController::class)->except(['show']);
+
+    Route::resource('feeding-records', FeedingRecordController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
 });
 
 require __DIR__.'/auth.php';

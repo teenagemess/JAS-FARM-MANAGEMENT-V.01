@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="text-xl font-semibold leading-tight text-gray-800">
-            {{ __('Tambah Data Domba Baru') }}
+            {{ __('Edit Kandang: ') . $shelter->name }}
         </h2>
     </x-slot>
 
@@ -21,9 +21,13 @@
                         </div>
                     @endif
 
-                    <form method="POST" action="{{ route('sheep.store') }}" enctype="multipart/form-data">
+                    <form method="POST" action="{{ route('shelters.update', $shelter) }}">
                         @csrf
-                        @include('sheep._form')
+                        @method('PUT') {{-- Gunakan PUT untuk update --}}
+
+                        {{-- Memanggil Partial Form --}}
+                        @include('shelters._form', ['shelter' => $shelter])
+
                     </form>
 
                 </div>

@@ -8,20 +8,50 @@ use App\Http\Requests\StoreSheepRequest;
 use App\Http\Requests\UpdateSheepRequest;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
 
 class SheepController extends Controller
 {
     /**
      * Menampilkan daftar semua data domba.
      */
-    public function index()
+    public function index(Request $request)
     {
-        // (Gunakan with() untuk Eager Loading - lebih efisien)
-        $sheep = Sheep::with('shelter')
-                      ->latest() // Urutkan berdasarkan yang terbaru
-                      ->paginate(12); // Ambil 12 data per halaman (Bagus untuk grid 3-4 kolom)
+        // (2) Mulai Query Builder
+        $query = Sheep::with('shelter');
 
-        return view('sheep.index', compact('sheep'));
+        // (3) Logika Search (Eartag)
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where('tag_number', 'like', "%{$search}%");
+        }
+
+        // (4) Logika Filter Gender
+        if ($request->filled('gender')) {
+            $query->where('gender', $request->input('gender'));
+        }
+
+        // (5) Logika Filter Kandang
+        if ($request->filled('shelter_id')) {
+            $query->where('shelter_id', $request->input('shelter_id'));
+        }
+
+        // (6) Logika Filter Kategori
+        if ($request->filled('category')) {
+            $query->where('category', $request->input('category'));
+        }
+
+        // Ambil data (Paginate + Query String agar filter tidak hilang saat ganti halaman)
+        $sheep = $query->latest()
+                       ->paginate(12)
+                       ->withQueryString();
+
+        // (7) Ambil data untuk opsi filter dropdown
+        $shelters = Shelter::orderBy('name')->get(['id', 'name']);
+        // Ambil kategori unik yang ada di database
+        $categories = Sheep::select('category')->distinct()->pluck('category');
+
+        return view('sheep.index', compact('sheep', 'shelters', 'categories'));
     }
 
     /**
@@ -66,10 +96,25 @@ class SheepController extends Controller
      */
     public function show(Sheep $sheep)
     {
-        // Muat relasi silsilah (opsional, tapi bagus)
+        // Muat relasi statis (silsilah & kandang)
         $sheep->load(['shelter', 'mother', 'father']);
 
-        return view('sheep.show', compact('sheep'));
+        // 1. Ambil Data Timbangan (Paginate: 5 per halaman)
+        // Gunakan nama parameter 'weight_page' agar tidak bentrok
+        $weightRecords = $sheep->weightRecords()
+                               ->orderBy('weighing_date', 'desc')
+                               ->orderBy('id', 'desc')
+                               ->paginate(5, ['*'], 'weight_page');
+
+        // 2. Ambil Data Kesehatan (Paginate: 5 per halaman)
+        // Gunakan nama parameter 'health_page'
+        $healthRecords = $sheep->healthRecords()
+                               ->with('symptoms')
+                               ->orderBy('record_date', 'desc')
+                               ->orderBy('id', 'desc')
+                               ->paginate(5, ['*'], 'health_page');
+
+        return view('sheep.show', compact('sheep', 'weightRecords', 'healthRecords'));
     }
 
     /**

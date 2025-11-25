@@ -16,6 +16,7 @@ class ReproductionRecord extends Model
         'male_sheep_id',
         'status',
         'mating_date',
+        'expected_delivery_date',
         'actual_delivery_date',
         'weaning_date',
         'offspring_count',
@@ -23,35 +24,49 @@ class ReproductionRecord extends Model
     ];
 
     /**
-     * Pastikan kolom tanggal diubah menjadi objek Carbon.
+     * PERBAIKAN UTAMA:
+     * Properti $casts ini memberi tahu Laravel bahwa kolom-kolom ini
+     * harus diperlakukan sebagai objek Tanggal (Carbon), bukan string.
      */
-    protected $dates = [
-        'mating_date',
-        'expected_delivery_date',
-        'actual_delivery_date',
-        'weaning_date',
+    protected $casts = [
+        'mating_date' => 'date',
+        'expected_delivery_date' => 'date',
+        'actual_delivery_date' => 'date',
+        'weaning_date' => 'date',
     ];
+
+    // --- ACCESSOR (Logika Tampilan) ---
+
+    /**
+     * Mendapatkan kelas CSS untuk badge status.
+     * Cara panggil: $repro->badge_style
+     */
+    public function getBadgeStyleAttribute()
+    {
+        return match ($this->status) {
+            'Planned' => 'bg-gray-100 text-gray-800',
+            'Mated' => 'bg-blue-100 text-blue-800',
+            'Pregnant' => 'bg-purple-100 text-purple-800 border border-purple-300',
+            'Delivered' => 'bg-green-100 text-green-800',
+            'Failed' => 'bg-red-100 text-red-800',
+            default => 'bg-gray-100 text-gray-800',
+        };
+    }
 
     // --- MUTATOR (Logika Otomatis) ---
 
     /**
      * Mutator untuk menghitung 'expected_delivery_date' saat 'mating_date' diatur.
-     * Rata-rata masa kehamilan domba adalah 147 hari.
      */
-public function setMatingDateAttribute($value)
+    public function setMatingDateAttribute($value)
     {
-        // 1. Set nilai mating_date ke atribut database
         $this->attributes['mating_date'] = $value;
 
-        // 2. Lakukan kalkulasi hanya jika ada nilai
         if ($value) {
             $matingDate = Carbon::parse($value);
-
-            // 3. Tambahkan 147 hari dan set nilai ke expected_delivery_date
             $this->attributes['expected_delivery_date'] = $matingDate->addDays(147);
         }
     }
-
 
     // --- RELASI ---
 
@@ -69,6 +84,4 @@ public function setMatingDateAttribute($value)
     {
         return $this->belongsTo(User::class, 'assistance_user_id');
     }
-
-    // Anda juga perlu menambahkan relasi ke Model Sheep (kebalikan)
 }
