@@ -19,21 +19,24 @@
                 </div>
             @endif
 
-            {{-- === FILTER & SEARCH BAR (BARU) === --}}
+            {{-- === FILTER & SEARCH BAR (MANUAL SUBMIT) === --}}
             <div class="p-4 mb-6 bg-white rounded-lg shadow-sm">
+                {{-- Hapus ID form karena tidak lagi dipakai JS --}}
                 <form method="GET" action="{{ route('sheep.index') }}">
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-5">
+                    <div class="grid items-end grid-cols-1 gap-4 md:grid-cols-5">
 
                         {{-- 1. Search Eartag --}}
                         <div class="col-span-1 md:col-span-2">
-                            <x-text-input id="search" name="search" type="text" class="w-full"
-                                placeholder="Cari Eartag..."
+                            <x-input-label for="search" :value="__('Cari Eartag')" />
+                            <x-text-input id="search" name="search" type="text" class="w-full mt-1"
+                                placeholder="JAS-001 atau 001"
                                 :value="request('search')" />
                         </div>
 
                         {{-- 2. Filter Gender --}}
                         <div>
-                            <select name="gender" class="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <x-input-label for="gender" :value="__('Filter Gender')" />
+                            <select name="gender" id="gender" class="w-full mt-1 text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 <option value="">Semua Gender</option>
                                 <option value="Jantan" {{ request('gender') == 'Jantan' ? 'selected' : '' }}>Jantan</option>
                                 <option value="Betina" {{ request('gender') == 'Betina' ? 'selected' : '' }}>Betina</option>
@@ -42,7 +45,8 @@
 
                         {{-- 3. Filter Kandang --}}
                         <div>
-                            <select name="shelter_id" class="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <x-input-label for="shelter_id" :value="__('Filter Kandang')" />
+                            <select name="shelter_id" id="shelter_id" class="w-full mt-1 text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 <option value="">Semua Kandang</option>
                                 @foreach($shelters as $shelter)
                                     <option value="{{ $shelter->id }}" {{ request('shelter_id') == $shelter->id ? 'selected' : '' }}>
@@ -52,15 +56,16 @@
                             </select>
                         </div>
 
-                        {{-- 4. Tombol Action --}}
+                        {{-- 4. Tombol Action (Cari & Reset) --}}
                         <div class="flex space-x-2">
+                            {{-- Tombol Cari Dikembalikan --}}
                             <x-primary-button type="submit" class="justify-center w-full">
                                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                                Cari
+                                {{ __('Cari') }}
                             </x-primary-button>
 
-                            @if(request()->hasAny(['search', 'gender', 'shelter_id', 'category']))
-                                <a href="{{ route('sheep.index') }}" class="inline-flex items-center px-4 py-2 text-xs font-semibold tracking-widest text-gray-700 uppercase transition duration-150 ease-in-out bg-gray-200 border border-transparent rounded-md hover:bg-gray-300 active:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                            @if(request()->hasAny(['search', 'gender', 'shelter_id']))
+                                <a href="{{ route('sheep.index') }}" class="inline-flex items-center justify-center w-full px-4 py-2 text-xs font-semibold tracking-widest text-center text-gray-700 uppercase transition duration-150 ease-in-out bg-gray-200 border border-transparent rounded-md hover:bg-gray-300 active:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
                                     Reset
                                 </a>
                             @endif
@@ -74,25 +79,33 @@
             <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 
                 @forelse ($sheep as $s)
-                    {{-- LOGIKA STATUS KESEHATAN --}}
                     @php
-                        $activeSickness = $s->healthRecords
-                            ->filter(function ($record) {
-                                return !in_array($record->status, ['Completed', 'Sembuh / Selesai']);
-                            })
+                        // 1. LOGIKA KESEHATAN (VERSI LEBIH STABIL)
+                        $latestRecord = $s->healthRecords
                             ->sort(function ($a, $b) {
-                                if ($a->record_date == $b->record_date) {
+                                // Gunakan Carbon::parse agar aman baik itu string maupun objek date
+                                $dateA = \Carbon\Carbon::parse($a->record_date)->timestamp;
+                                $dateB = \Carbon\Carbon::parse($b->record_date)->timestamp;
+
+                                // Jika tanggal sama persis, gunakan ID terbesar (inputan terakhir)
+                                if ($dateA === $dateB) {
                                     return $b->id - $a->id;
                                 }
-                                return strtotime($b->record_date) - strtotime($a->record_date);
+
+                                // Urutkan tanggal dari yang paling baru (DESC)
+                                return $dateB - $dateA;
                             })
                             ->first();
 
                         $activeSickness = null;
-                        if ($activeSickness && !in_array($activeSickness->status, ['Completed', 'Sembuh / Selesai'])) {
-                            $activeSickness = $activeSickness;
+
+                        // 2. Cek Status
+                        // Tag hanya muncul jika ada record DAN statusnya BUKAN 'Completed' atau 'Sembuh / Selesai'
+                        if ($latestRecord && !in_array($latestRecord->status, ['Completed', 'Sembuh / Selesai'])) {
+                            $activeSickness = $latestRecord;
                         }
 
+                        // 3. Logika Kehamilan
                         $activePregnancy = null;
                         if ($s->gender === 'Betina') {
                             $activePregnancy = $s->asDamReproductionRecords
@@ -100,6 +113,7 @@
                                 ->first();
                         }
 
+                        // 4. Border Kartu
                         $cardBorderClass = '';
                         if ($activeSickness) {
                             $cardBorderClass = 'border-2 border-red-400 shadow-red-200';
@@ -111,6 +125,7 @@
                     <a href="{{ route('sheep.show', $s) }}" class="block">
                         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg h-full flex flex-col transition-transform transform hover:scale-105 {{ $cardBorderClass }}">
 
+                            {{-- Kontainer Gambar --}}
                             <div class="relative">
                                 <img
                                     class="object-cover w-full h-56"
@@ -119,6 +134,7 @@
                                     onerror="this.onerror=null; this.src='https://placehold.co/600x400/e2e8f0/9ca3af?text=Image+Error';"
                                 >
 
+                                {{-- AREA BADGE --}}
                                 <div class="absolute flex flex-col items-end gap-1 top-2 right-2">
                                     @if($s->is_pedigree)
                                         <span class="bg-yellow-500 text-yellow-900 text-[10px] font-bold px-2 py-1 rounded shadow-md border border-yellow-600">
@@ -126,6 +142,7 @@
                                         </span>
                                     @endif
 
+                                    {{-- Badge Kesehatan (Hanya muncul jika SAKIT) --}}
                                     @if($activeSickness)
                                         <span class="{{ $activeSickness->badge_style }} text-[10px] font-bold px-2 py-1 rounded shadow-md animate-pulse border border-white/20 text-right">
                                             {{ $activeSickness->status }}
@@ -136,6 +153,7 @@
                                         </span>
                                     @endif
 
+                                    {{-- Badge Kehamilan --}}
                                     @if($activePregnancy)
                                         <span class="bg-purple-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md border border-purple-400 text-right">
                                             HAMIL
@@ -148,6 +166,7 @@
                                 </div>
                             </div>
 
+                            {{-- Konten Teks --}}
                             <div class="flex-grow p-6 text-gray-900">
                                 <h3 class="mb-1 text-lg font-bold">{{ $s->tag_number }}</h3>
                                 <p class="flex items-center mb-2 text-sm text-gray-600">
@@ -164,21 +183,12 @@
                                         <span class="text-gray-500">Gender:</span>
                                         @if($s->gender == 'Jantan')
                                             <span class="flex items-center font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 text-xs">
-                                                <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path>
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 5L13.6 10.4"></path>
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 5h-5"></path>
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 5v5"></path>
-                                                </svg>
+                                                <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 5L13.6 10.4"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 5h-5"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 5v5"></path></svg>
                                                 Jantan
                                             </span>
                                         @else
                                             <span class="flex items-center font-bold text-pink-500 bg-pink-50 px-2 py-0.5 rounded-full border border-pink-100 text-xs">
-                                                <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"></path>
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14v7"></path>
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 18h6"></path>
-                                                </svg>
+                                                <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14v7"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 18h6"></path></svg>
                                                 Betina
                                             </span>
                                         @endif
@@ -215,4 +225,6 @@
 
         </div>
     </div>
+
+    {{-- Script untuk Debounce dihapus agar tidak hot reload --}}
 </x-app-layout>
