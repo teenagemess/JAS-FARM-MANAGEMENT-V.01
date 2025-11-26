@@ -21,24 +21,77 @@
 
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 
-                {{-- KOLOM KIRI: INFO UTAMA & REPRODUKSI --}}
+                {{-- KOLOM KIRI: INFO UTAMA --}}
                 <div class="space-y-6 lg:col-span-2">
 
-                    {{-- 1. INFO UTAMA --}}
+                    {{-- 1. KARTU INFO UTAMA & QR --}}
                     <div class="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                         <div class="p-6 text-gray-900">
+
+                            {{-- LOGIKA STATUS (Sama dengan Index) --}}
+                            @php
+                                // 1. Status Kesehatan Aktif
+                                $activeSickness = $sheep->healthRecords
+                                    ->sort(function ($a, $b) {
+                                        if ($a->record_date == $b->record_date) {
+                                            return $b->id - $a->id;
+                                        }
+                                        return strtotime($b->record_date) - strtotime($a->record_date);
+                                    })
+                                    ->first();
+
+                                if ($activeSickness && in_array($activeSickness->status, ['Completed', 'Sembuh / Selesai'])) {
+                                    $activeSickness = null;
+                                }
+
+                                // 2. Status Kehamilan
+                                $activePregnancy = null;
+                                if ($sheep->gender === 'Betina') {
+                                    $activePregnancy = $sheep->asDamReproductionRecords
+                                        ->where('status', 'Pregnant')
+                                        ->first();
+                                }
+                            @endphp
+
                             <div class="flex items-start justify-between mb-4">
-                                <div>
+                                <div class="flex flex-col gap-2">
                                     <h3 class="text-2xl font-bold">Eartag: {{ $sheep->tag_number }}</h3>
-                                    @if($sheep->is_pedigree)
-                                        <span class="inline-block px-3 py-1 mt-1 text-xs font-bold text-yellow-900 bg-yellow-500 rounded-full shadow-md">
-                                            Bibit Unggul
-                                        </span>
-                                    @endif
+
+                                    <div class="flex flex-wrap gap-2">
+                                        {{-- Badge Bibit Unggul --}}
+                                        @if($sheep->is_pedigree)
+                                            <span class="inline-block px-3 py-1 text-xs font-bold text-yellow-900 bg-yellow-500 rounded-full shadow-md">
+                                                Bibit Unggul
+                                            </span>
+                                        @endif
+
+                                        {{-- Badge SAKIT (Jika ada) --}}
+                                        @if($activeSickness)
+                                            <span class="{{ $activeSickness->badge_style }} inline-block px-3 py-1 text-xs font-bold rounded-full shadow-md animate-pulse">
+                                                {{ $activeSickness->status }}: {{ Str::limit($activeSickness->diagnosis, 15) }}
+                                            </span>
+                                        @endif
+
+                                        {{-- Badge HAMIL (Jika ada) --}}
+                                        @if($activePregnancy)
+                                            <span class="inline-block px-3 py-1 text-xs font-bold text-white bg-purple-600 border border-purple-400 rounded-full shadow-md">
+                                                HAMIL (HPL: {{ \Carbon\Carbon::parse($activePregnancy->expected_delivery_date)->diffForHumans() }})
+                                            </span>
+                                        @endif
+                                    </div>
                                 </div>
-                                <a href="{{ route('sheep.edit', $sheep) }}">
-                                    <x-secondary-button>Edit Data</x-secondary-button>
-                                </a>
+
+                                <div class="flex space-x-2">
+                                    {{-- Tombol Lihat QR Code --}}
+                                    <button onclick="openQrModal()" class="px-3 py-1 text-sm font-bold text-gray-700 bg-gray-100 border rounded hover:bg-gray-200">
+                                        <svg class="inline-block w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+                                        QR Code
+                                    </button>
+
+                                    <a href="{{ route('sheep.edit', $sheep) }}">
+                                        <x-secondary-button>Edit Data</x-secondary-button>
+                                    </a>
+                                </div>
                             </div>
 
                             <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -90,30 +143,25 @@
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-gray-200">
+                                            {{-- Kita ambil data reproduksi yang dikirim dari controller jika ada, atau lazy load --}}
+                                            {{-- Di controller show kita tidak mem-pass $reproductionRecords, jadi pakai relasi langsung --}}
                                             @forelse($sheep->asDamReproductionRecords()->with('sire')->orderBy('mating_date', 'desc')->orderBy('id', 'desc')->get() as $repro)
                                                 <tr>
                                                     <td class="px-4 py-2 text-sm text-gray-900">{{ \Carbon\Carbon::parse($repro->mating_date)->format('d M Y') }}</td>
                                                     <td class="px-4 py-2 text-sm text-gray-900">{{ $repro->sire->tag_number ?? '-' }}</td>
 
-                                                    {{-- KOLOM LOGIKA TANGGAL --}}
                                                     <td class="px-4 py-2 text-sm text-gray-900">
                                                         @if($repro->status == 'Delivered' && $repro->actual_delivery_date)
-                                                            {{-- Jika sudah lahir: Tampilkan Tgl Lahir & Jumlah Anak --}}
                                                             <span class="font-bold text-green-700">Lahir: {{ $repro->actual_delivery_date->format('d M Y') }}</span>
                                                             <br><span class="text-xs text-gray-500">({{ $repro->offspring_count }} anak)</span>
-
                                                         @elseif($repro->status == 'Pregnant')
-                                                            {{-- Jika hamil: Tampilkan HPL & Hitung Mundur --}}
                                                             HPL: {{ $repro->expected_delivery_date ? $repro->expected_delivery_date->format('d M Y') : '-' }}
                                                             <br><span class="text-xs font-bold text-purple-600">({{ $repro->expected_delivery_date ? $repro->expected_delivery_date->diffForHumans() : '' }})</span>
-
                                                         @else
-                                                            {{-- Status lain (Planned/Failed): Tampilkan HPL biasa --}}
                                                             HPL: {{ $repro->expected_delivery_date ? $repro->expected_delivery_date->format('d M Y') : '-' }}
                                                         @endif
                                                     </td>
 
-                                                    {{-- KOLOM STATUS DENGAN BADGE STYLE --}}
                                                     <td class="px-4 py-2 text-sm">
                                                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $repro->badge_style }}">
                                                             {{ $repro->status }}
@@ -122,10 +170,8 @@
 
                                                     <td class="px-4 py-2 text-sm text-right">
                                                         <div class="flex justify-end space-x-2">
-                                                            {{-- PERBAIKAN: Gunakan 'reproduction-records.edit' (tanpa sheep.) --}}
                                                             <a href="{{ route('reproduction-records.edit', $repro) }}" class="font-bold text-indigo-600 hover:text-indigo-900">Update</a>
 
-                                                            {{-- Gunakan 'reproduction-records.destroy' (tanpa sheep.) --}}
                                                             <form action="{{ route('reproduction-records.destroy', $repro) }}" method="POST" onsubmit="return confirm('Hapus data ini?');" class="inline">
                                                                 @csrf @method('DELETE')
                                                                 <button type="submit" class="text-red-600 hover:text-red-900">Hapus</button>
@@ -242,4 +288,27 @@
             </div>
         </div>
     </div>
+
+    {{-- MODAL POPUP QR CODE --}}
+    <div id="qrModal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-black bg-opacity-50">
+        <div class="w-full max-w-sm p-6 text-center bg-white rounded-lg shadow-lg">
+            <h3 class="mb-4 text-lg font-bold">QR Code Domba: {{ $sheep->tag_number }}</h3>
+            <div class="flex justify-center mb-4">
+                {{-- Generate QR Code --}}
+                {{-- PERBAIKAN: Gunakan Full Namespace untuk menghindari error 'Class not found' --}}
+                {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::size(200)->generate(route('sheep.show', $sheep)) !!}
+            </div>
+            <p class="mb-4 text-sm text-gray-500">Scan untuk membuka profil domba ini.</p>
+            <button onclick="closeQrModal()" class="px-4 py-2 text-white bg-indigo-600 rounded hover:bg-indigo-700">Tutup</button>
+        </div>
+    </div>
+
+    <script>
+        function openQrModal() {
+            document.getElementById('qrModal').classList.remove('hidden');
+        }
+        function closeQrModal() {
+            document.getElementById('qrModal').classList.add('hidden');
+        }
+    </script>
 </x-app-layout>
