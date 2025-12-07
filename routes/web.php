@@ -50,7 +50,7 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('feed-types', FeedTypeController::class)->except(['show']);
 
-    Route::resource('feeding-records', FeedingRecordController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
+    Route::resource('feeding-records', FeedingRecordController::class);
 });
 
 require __DIR__.'/auth.php';

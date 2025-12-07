@@ -111,9 +111,8 @@
                                     <p><strong>Kategori:</strong> {{ $sheep->category }}</p>
                                     <p><strong>Tipe/Ras:</strong> {{ $sheep->type }}</p>
                                     <hr>
-                                    <p><strong>Induk Betina:</strong> {{ $sheep->mother->tag_number ?? 'Tidak Diketahui' }}</p>
-                                    <p><strong>Induk Pejantan:</strong> {{ $sheep->father->tag_number ?? 'Tidak Diketahui' }}</p>
-                                    <hr>
+                                    {{-- <p><strong>Induk Betina:</strong> {{ $sheep->mother->tag_number ?? 'Tidak Diketahui' }}</p>
+                                    <p><strong>Induk Pejantan:</strong> {{ $sheep->father->tag_number ?? 'Tidak Diketahui' }}</p> --}}
                                     <p><strong>Harga Beli:</strong> Rp {{ number_format($sheep->purchase_price, 0, ',', '.') }}</p>
                                     <p><strong>Deskripsi:</strong> {{ $sheep->description ?? '-' }}</p>
                                 </div>
@@ -235,9 +234,165 @@
                             <div class="mt-4">{{ $weightRecords->links() }}</div>
                         </div>
                     </div>
+
+                    {{-- 4. SILSILAH & KELUARGA (BARU) --}}
+                    <div class="overflow-hidden bg-white shadow-sm sm:rounded-lg">
+                        <div class="p-6 text-gray-900">
+                            <h3 class="mb-4 text-lg font-bold text-center">Silsilah & Keluarga</h3>
+
+                            @php
+                                // Logika Data Silsilah
+                                // 1. Anak
+                                $children = $sheep->gender === 'Jantan' ? $sheep->offspringAsFather : $sheep->offspringAsMother;
+
+                                // 2. Saudara (Siblings)
+                                $siblings = collect();
+                                if ($sheep->father_id || $sheep->mother_id) {
+                                    $siblings = \App\Models\Sheep::where('id', '!=', $sheep->id)
+                                        ->where(function($query) use ($sheep) {
+                                            if ($sheep->father_id) $query->orWhere('father_id', $sheep->father_id);
+                                            if ($sheep->mother_id) $query->orWhere('mother_id', $sheep->mother_id);
+                                        })
+                                        ->get();
+                                }
+                            @endphp
+
+                            {{-- TABEL ORANG TUA --}}
+                            <h4 class="mb-2 text-base font-semibold text-center">Orang Tua</h4>
+                            <div class="mb-6 overflow-x-auto border rounded-lg">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Peran</th>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Eartag</th>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Jenis Kelamin</th>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Tanggal Lahir</th>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Ibu</th>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Bapak</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        {{-- IBU --}}
+                                        <tr>
+                                            <td class="px-4 py-2 text-sm text-gray-500">Ibu (Dam)</td>
+                                            <td class="px-4 py-2 text-sm font-bold text-indigo-600">
+                                                @if($sheep->mother)
+                                                    <a href="{{ route('sheep.show', $sheep->mother) }}">{{ $sheep->mother->tag_number }}</a>
+                                                @else
+                                                    -
+                                                @endif
+                                            </td>
+                                            <td class="px-4 py-2 text-sm text-gray-500">Betina</td>
+                                            <td class="px-4 py-2 text-sm text-gray-500">{{ $sheep->mother ? $sheep->mother->date_of_birth->format('Y-m-d') : '-' }}</td>
+                                            <td class="px-4 py-2 text-sm text-gray-500">{{ $sheep->mother?->mother?->tag_number ?? '-' }}</td>
+                                            <td class="px-4 py-2 text-sm text-gray-500">{{ $sheep->mother?->father?->tag_number ?? '-' }}</td>
+                                        </tr>
+                                        {{-- BAPAK --}}
+                                        <tr>
+                                            <td class="px-4 py-2 text-sm text-gray-500">Bapak (Sire)</td>
+                                            <td class="px-4 py-2 text-sm font-bold text-indigo-600">
+                                                @if($sheep->father)
+                                                    <a href="{{ route('sheep.show', $sheep->father) }}">{{ $sheep->father->tag_number }}</a>
+                                                @else
+                                                    -
+                                                @endif
+                                            </td>
+                                            <td class="px-4 py-2 text-sm text-gray-500">Jantan</td>
+                                            <td class="px-4 py-2 text-sm text-gray-500">{{ $sheep->father ? $sheep->father->date_of_birth->format('Y-m-d') : '-' }}</td>
+                                            <td class="px-4 py-2 text-sm text-gray-500">{{ $sheep->father?->mother?->tag_number ?? '-' }}</td>
+                                            <td class="px-4 py-2 text-sm text-gray-500">{{ $sheep->father?->father?->tag_number ?? '-' }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {{-- TABEL SAUDARA --}}
+                            <h4 class="mb-2 text-base font-semibold text-center">Saudara</h4>
+                            <div class="mb-6 overflow-x-auto border rounded-lg">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Eartag</th>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Jenis Kelamin</th>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Tanggal Lahir</th>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Ibu</th>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Bapak</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        @forelse($siblings as $sib)
+                                            <tr>
+                                                <td class="px-4 py-2 text-sm font-bold text-indigo-600">
+                                                    <a href="{{ route('sheep.show', $sib) }}">{{ $sib->tag_number }}</a>
+                                                </td>
+                                                <td class="px-4 py-2 text-sm text-gray-500">{{ $sib->gender }}</td>
+                                                <td class="px-4 py-2 text-sm text-gray-500">{{ $sib->date_of_birth->format('Y-m-d') }}</td>
+                                                <td class="px-4 py-2 text-sm text-gray-500">
+                                                    @if($sib->mother)
+                                                        <a href="{{ route('sheep.show', $sib->mother) }}" class="text-indigo-600 hover:underline">{{ $sib->mother->tag_number }}</a>
+                                                    @else - @endif
+                                                </td>
+                                                <td class="px-4 py-2 text-sm text-gray-500">
+                                                    @if($sib->father)
+                                                        <a href="{{ route('sheep.show', $sib->father) }}" class="text-indigo-600 hover:underline">{{ $sib->father->tag_number }}</a>
+                                                    @else - @endif
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="5" class="px-4 py-4 text-sm text-center text-gray-500">Tidak ada data saudara yang tercatat.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {{-- TABEL ANAK --}}
+                            <h4 class="mb-2 text-base font-semibold text-center">Anak</h4>
+                            <div class="overflow-x-auto border rounded-lg">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Eartag</th>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Jenis Kelamin</th>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Tanggal Lahir</th>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Ibu</th>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Bapak</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        @forelse($children as $child)
+                                            <tr>
+                                                <td class="px-4 py-2 text-sm font-bold text-indigo-600">
+                                                    <a href="{{ route('sheep.show', $child) }}">{{ $child->tag_number }}</a>
+                                                </td>
+                                                <td class="px-4 py-2 text-sm text-gray-500">{{ $child->gender }}</td>
+                                                <td class="px-4 py-2 text-sm text-gray-500">{{ $child->date_of_birth->format('Y-m-d') }}</td>
+                                                <td class="px-4 py-2 text-sm text-gray-500">
+                                                    @if($child->mother)
+                                                        <a href="{{ route('sheep.show', $child->mother) }}" class="text-indigo-600 hover:underline">{{ $child->mother->tag_number }}</a>
+                                                    @else - @endif
+                                                </td>
+                                                <td class="px-4 py-2 text-sm text-gray-500">
+                                                    @if($child->father)
+                                                        <a href="{{ route('sheep.show', $child->father) }}" class="text-indigo-600 hover:underline">{{ $child->father->tag_number }}</a>
+                                                    @else - @endif
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="5" class="px-4 py-4 text-sm text-center text-gray-500">Belum ada data anak.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+
+                        </div>
+                    </div>
                 </div>
 
-                {{-- KOLOM KANAN: RIWAYAT KESEHATAN --}}
+                {{-- KOLOM KANAN: RIWAYAT KESEHATAN (Tidak Berubah) --}}
                 <div class="space-y-6 lg:col-span-1">
                     <div class="overflow-hidden bg-white border-t-4 border-red-500 shadow-sm sm:rounded-lg">
                         <div class="p-6 text-gray-900">

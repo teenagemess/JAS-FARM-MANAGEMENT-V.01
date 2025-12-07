@@ -18,11 +18,11 @@
                     <x-nav-link :href="route('sheep.index')" :active="request()->routeIs('sheep.*')">
                         {{ __('Domba') }}
                     </x-nav-link>
-                    <x-nav-link :href="route('shelters.index')" :active="request()->routeIs('shelters.*')">
-                        {{ __('Kandang') }}
-                    </x-nav-link>
                     <x-nav-link :href="route('feeding-records.index')" :active="request()->routeIs('feeding-records.*')">
                         {{ __('Pakan Harian') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('shelters.index')" :active="request()->routeIs('shelters.*')">
+                        {{ __('Kandang') }}
                     </x-nav-link>
 
                     <!-- DROPDOWN KATEGORI (Desktop) -->
@@ -108,11 +108,11 @@
             <x-responsive-nav-link :href="route('sheep.index')" :active="request()->routeIs('sheep.*')">
                 {{ __('Domba') }}
             </x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('shelters.index')" :active="request()->routeIs('shelters.*')">
-                {{ __('Kandang') }}
-            </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('feeding-records.index')" :active="request()->routeIs('feeding-records.*')">
                 {{ __('Pakan Harian') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('shelters.index')" :active="request()->routeIs('shelters.*')">
+                {{ __('Kandang') }}
             </x-responsive-nav-link>
 
             <!-- DROPDOWN KATEGORI (Responsive) -->

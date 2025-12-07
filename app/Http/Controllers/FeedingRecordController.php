@@ -7,15 +7,41 @@ use App\Models\FeedType;
 use App\Models\FeedingRecord;
 use App\Http\Requests\StoreFeedingRecordRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request; // (1) PENTING: Tambahkan ini untuk menangkap filter
 
 class FeedingRecordController extends Controller
 {
-    public function index()
+    // (2) UPDATE METHOD INDEX: Tambahkan Request $request
+    public function index(Request $request)
     {
-        $feedingRecords = FeedingRecord::with(['shelter', 'user', 'feedTypes'])
-                                      ->orderByDesc('date')
-                                      ->paginate(10);
-        return view('feeding_records.index', compact('feedingRecords'));
+        // Mulai query dasar
+        $query = FeedingRecord::with(['shelter', 'user', 'feedTypes']);
+
+        // Logika Filter: Tanggal Mulai
+        if ($request->filled('start_date')) {
+            $query->whereDate('date', '>=', $request->start_date);
+        }
+
+        // Logika Filter: Tanggal Akhir
+        if ($request->filled('end_date')) {
+            $query->whereDate('date', '<=', $request->end_date);
+        }
+
+        // Logika Filter: Kandang
+        if ($request->filled('shelter_id')) {
+            $query->where('shelter_id', $request->shelter_id);
+        }
+
+        // Eksekusi query dengan urutan tanggal terbaru
+        // withQueryString() penting agar filter tidak hilang saat klik halaman 2, 3, dst.
+        $feedingRecords = $query->orderByDesc('date')
+                                ->paginate(10)
+                                ->withQueryString();
+
+        // Ambil data shelter untuk dropdown filter di View
+        $shelters = Shelter::orderBy('name')->get(['id', 'name']);
+
+        return view('feeding_records.index', compact('feedingRecords', 'shelters'));
     }
 
     public function create()
@@ -30,7 +56,6 @@ class FeedingRecordController extends Controller
     {
         $data = $request->validated();
 
-        // Cek duplikasi
         $exists = FeedingRecord::where('shelter_id', $data['shelter_id'])
                                ->where('date', $data['date'])
                                ->exists();
@@ -49,24 +74,27 @@ class FeedingRecordController extends Controller
         return redirect()->route('feeding-records.index')->with('success', 'Pencatatan pakan harian berhasil!');
     }
 
-    // (BARU) Method Edit
+    public function show(FeedingRecord $feedingRecord)
+    {
+        $feedingRecord->load(['shelter', 'user', 'feedTypes']);
+
+        return view('feeding_records.show', compact('feedingRecord'));
+    }
+
     public function edit(FeedingRecord $feedingRecord)
     {
         $shelters = Shelter::orderBy('name')->get(['id', 'name']);
         $feedTypes = FeedType::orderBy('name')->get(['id', 'name', 'unit', 'price_per_unit']);
 
-        // Load relasi feedTypes agar muncul di form edit
         $feedingRecord->load('feedTypes');
 
         return view('feeding_records.edit', compact('feedingRecord', 'shelters', 'feedTypes'));
     }
 
-    // (BARU) Method Update
     public function update(StoreFeedingRecordRequest $request, FeedingRecord $feedingRecord)
     {
         $data = $request->validated();
 
-        // Cek duplikasi (abaikan ID saat ini)
         $exists = FeedingRecord::where('shelter_id', $data['shelter_id'])
                                ->where('date', $data['date'])
                                ->where('id', '!=', $feedingRecord->id)
@@ -76,7 +104,6 @@ class FeedingRecordController extends Controller
             return back()->withInput()->with('error', 'Catatan pakan untuk kandang ini pada tanggal ini sudah ada!');
         }
 
-        // Update Data Utama
         $feedingRecord->update([
             'shelter_id' => $data['shelter_id'],
             'date' => $data['date'],
@@ -84,23 +111,20 @@ class FeedingRecordController extends Controller
             'time_evening' => $data['time_evening'],
         ]);
 
-        // Update Data Pivot (Sync akan menghapus yang lama dan insert yang baru)
         $pivotData = $this->preparePivotData($data['feed_types']);
         $feedingRecord->feedTypes()->sync($pivotData);
 
         return redirect()->route('feeding-records.index')->with('success', 'Data pakan berhasil diperbarui!');
     }
 
-    // (BARU) Method Destroy
     public function destroy(FeedingRecord $feedingRecord)
     {
-        $feedingRecord->feedTypes()->detach(); // Hapus relasi pivot
-        $feedingRecord->delete(); // Hapus record utama
+        $feedingRecord->feedTypes()->detach();
+        $feedingRecord->delete();
 
         return redirect()->route('feeding-records.index')->with('success', 'Data pakan berhasil dihapus.');
     }
 
-    // Helper untuk menyiapkan data pivot
     private function preparePivotData($feedTypesInput)
     {
         return collect($feedTypesInput)->mapWithKeys(function ($feed) {
