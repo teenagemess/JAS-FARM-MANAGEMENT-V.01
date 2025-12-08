@@ -21,16 +21,16 @@
 
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 
-                {{-- KOLOM KIRI: INFO UTAMA --}}
+                {{-- KOLOM KIRI (75%) --}}
                 <div class="space-y-6 lg:col-span-2">
 
                     {{-- 1. KARTU INFO UTAMA & QR --}}
                     <div class="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                         <div class="p-6 text-gray-900">
 
-                            {{-- LOGIKA STATUS (Sama dengan Index) --}}
+                            {{-- LOGIKA STATUS (DIJAMIN TIDAK HILANG) --}}
                             @php
-                                // 1. Status Kesehatan Aktif
+                                // Status Kesehatan Aktif
                                 $activeSickness = $sheep->healthRecords
                                     ->sort(function ($a, $b) {
                                         if ($a->record_date == $b->record_date) {
@@ -44,7 +44,7 @@
                                     $activeSickness = null;
                                 }
 
-                                // 2. Status Kehamilan
+                                // Status Kehamilan
                                 $activePregnancy = null;
                                 if ($sheep->gender === 'Betina') {
                                     $activePregnancy = $sheep->asDamReproductionRecords
@@ -111,8 +111,6 @@
                                     <p><strong>Kategori:</strong> {{ $sheep->category }}</p>
                                     <p><strong>Tipe/Ras:</strong> {{ $sheep->type }}</p>
                                     <hr>
-                                    {{-- <p><strong>Induk Betina:</strong> {{ $sheep->mother->tag_number ?? 'Tidak Diketahui' }}</p>
-                                    <p><strong>Induk Pejantan:</strong> {{ $sheep->father->tag_number ?? 'Tidak Diketahui' }}</p> --}}
                                     <p><strong>Harga Beli:</strong> Rp {{ number_format($sheep->purchase_price, 0, ',', '.') }}</p>
                                     <p><strong>Deskripsi:</strong> {{ $sheep->description ?? '-' }}</p>
                                 </div>
@@ -120,7 +118,7 @@
                         </div>
                     </div>
 
-                    {{-- 2. RIWAYAT REPRODUKSI --}}
+                    {{-- 2. RIWAYAT REPRODUKSI (KHUSUS BETINA) --}}
                     @if($sheep->gender === 'Betina')
                         <div class="overflow-hidden bg-white border-l-4 border-purple-500 shadow-sm sm:rounded-lg">
                             <div class="p-6 text-gray-900">
@@ -142,8 +140,6 @@
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-gray-200">
-                                            {{-- Kita ambil data reproduksi yang dikirim dari controller jika ada, atau lazy load --}}
-                                            {{-- Di controller show kita tidak mem-pass $reproductionRecords, jadi pakai relasi langsung --}}
                                             @forelse($sheep->asDamReproductionRecords()->with('sire')->orderBy('mating_date', 'desc')->orderBy('id', 'desc')->get() as $repro)
                                                 <tr>
                                                     <td class="px-4 py-2 text-sm text-gray-900">{{ \Carbon\Carbon::parse($repro->mating_date)->format('d M Y') }}</td>
@@ -235,14 +231,14 @@
                         </div>
                     </div>
 
-                    {{-- 4. SILSILAH & KELUARGA (BARU) --}}
+                    {{-- 4. SILSILAH & KELUARGA (BARU DITAMBAHKAN) --}}
                     <div class="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                         <div class="p-6 text-gray-900">
                             <h3 class="mb-4 text-lg font-bold text-center">Silsilah & Keluarga</h3>
 
                             @php
                                 // Logika Data Silsilah
-                                // 1. Anak
+                                // 1. Anak (Offspring)
                                 $children = $sheep->gender === 'Jantan' ? $sheep->offspringAsFather : $sheep->offspringAsMother;
 
                                 // 2. Saudara (Siblings)
@@ -250,6 +246,7 @@
                                 if ($sheep->father_id || $sheep->mother_id) {
                                     $siblings = \App\Models\Sheep::where('id', '!=', $sheep->id)
                                         ->where(function($query) use ($sheep) {
+                                            // Memastikan hanya mengambil saudara kandung atau saudara tiri
                                             if ($sheep->father_id) $query->orWhere('father_id', $sheep->father_id);
                                             if ($sheep->mother_id) $query->orWhere('mother_id', $sheep->mother_id);
                                         })
@@ -258,7 +255,7 @@
                             @endphp
 
                             {{-- TABEL ORANG TUA --}}
-                            <h4 class="mb-2 text-base font-semibold text-center">Orang Tua</h4>
+                            <h4 class="pb-1 mb-2 text-base font-semibold text-center border-b">Orang Tua & Kakek/Nenek</h4>
                             <div class="mb-6 overflow-x-auto border rounded-lg">
                                 <table class="min-w-full divide-y divide-gray-200">
                                     <thead class="bg-gray-50">
@@ -266,48 +263,64 @@
                                             <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Peran</th>
                                             <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Eartag</th>
                                             <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Jenis Kelamin</th>
-                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Tanggal Lahir</th>
-                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Ibu</th>
-                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Bapak</th>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Tgl Lahir</th>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Ibu Pdgree</th>
+                                            <th class="px-4 py-2 text-xs font-medium text-left text-gray-500 uppercase">Bapak Pdgree</th>
                                         </tr>
                                     </thead>
                                     <tbody class="bg-white divide-y divide-gray-200">
                                         {{-- IBU --}}
                                         <tr>
-                                            <td class="px-4 py-2 text-sm text-gray-500">Ibu (Dam)</td>
+                                            <td class="px-4 py-2 text-sm font-semibold text-purple-700">Ibu (Dam)</td>
                                             <td class="px-4 py-2 text-sm font-bold text-indigo-600">
                                                 @if($sheep->mother)
                                                     <a href="{{ route('sheep.show', $sheep->mother) }}">{{ $sheep->mother->tag_number }}</a>
                                                 @else
-                                                    -
+                                                    <span class="text-gray-400">-</span>
                                                 @endif
                                             </td>
                                             <td class="px-4 py-2 text-sm text-gray-500">Betina</td>
                                             <td class="px-4 py-2 text-sm text-gray-500">{{ $sheep->mother ? $sheep->mother->date_of_birth->format('Y-m-d') : '-' }}</td>
-                                            <td class="px-4 py-2 text-sm text-gray-500">{{ $sheep->mother?->mother?->tag_number ?? '-' }}</td>
-                                            <td class="px-4 py-2 text-sm text-gray-500">{{ $sheep->mother?->father?->tag_number ?? '-' }}</td>
+                                            <td class="px-4 py-2 text-sm text-gray-500">
+                                                @if($sheep->mother?->mother)
+                                                    <a href="{{ route('sheep.show', $sheep->mother->mother) }}" class="text-indigo-600 hover:underline">{{ $sheep->mother->mother->tag_number }}</a>
+                                                @else - @endif
+                                            </td>
+                                            <td class="px-4 py-2 text-sm text-gray-500">
+                                                @if($sheep->mother?->father)
+                                                    <a href="{{ route('sheep.show', $sheep->mother->father) }}" class="text-indigo-600 hover:underline">{{ $sheep->mother->father->tag_number }}</a>
+                                                @else - @endif
+                                            </td>
                                         </tr>
                                         {{-- BAPAK --}}
                                         <tr>
-                                            <td class="px-4 py-2 text-sm text-gray-500">Bapak (Sire)</td>
+                                            <td class="px-4 py-2 text-sm font-semibold text-blue-700">Bapak (Sire)</td>
                                             <td class="px-4 py-2 text-sm font-bold text-indigo-600">
                                                 @if($sheep->father)
                                                     <a href="{{ route('sheep.show', $sheep->father) }}">{{ $sheep->father->tag_number }}</a>
                                                 @else
-                                                    -
+                                                    <span class="text-gray-400">-</span>
                                                 @endif
                                             </td>
                                             <td class="px-4 py-2 text-sm text-gray-500">Jantan</td>
                                             <td class="px-4 py-2 text-sm text-gray-500">{{ $sheep->father ? $sheep->father->date_of_birth->format('Y-m-d') : '-' }}</td>
-                                            <td class="px-4 py-2 text-sm text-gray-500">{{ $sheep->father?->mother?->tag_number ?? '-' }}</td>
-                                            <td class="px-4 py-2 text-sm text-gray-500">{{ $sheep->father?->father?->tag_number ?? '-' }}</td>
+                                            <td class="px-4 py-2 text-sm text-gray-500">
+                                                @if($sheep->father?->mother)
+                                                    <a href="{{ route('sheep.show', $sheep->father->mother) }}" class="text-indigo-600 hover:underline">{{ $sheep->father->mother->tag_number }}</a>
+                                                @else - @endif
+                                            </td>
+                                            <td class="px-4 py-2 text-sm text-gray-500">
+                                                @if($sheep->father?->father)
+                                                    <a href="{{ route('sheep.show', $sheep->father->father) }}" class="text-indigo-600 hover:underline">{{ $sheep->father->father->tag_number }}</a>
+                                                @else - @endif
+                                            </td>
                                         </tr>
                                     </tbody>
                                 </table>
                             </div>
 
                             {{-- TABEL SAUDARA --}}
-                            <h4 class="mb-2 text-base font-semibold text-center">Saudara</h4>
+                            <h4 class="pb-1 mb-2 text-base font-semibold text-center border-b">Saudara</h4>
                             <div class="mb-6 overflow-x-auto border rounded-lg">
                                 <table class="min-w-full divide-y divide-gray-200">
                                     <thead class="bg-gray-50">
@@ -348,7 +361,7 @@
                             </div>
 
                             {{-- TABEL ANAK --}}
-                            <h4 class="mb-2 text-base font-semibold text-center">Anak</h4>
+                            <h4 class="pb-1 mb-2 text-base font-semibold text-center border-b">Anak (Offspring)</h4>
                             <div class="overflow-x-auto border rounded-lg">
                                 <table class="min-w-full divide-y divide-gray-200">
                                     <thead class="bg-gray-50">
@@ -392,16 +405,66 @@
                     </div>
                 </div>
 
-                {{-- KOLOM KANAN: RIWAYAT KESEHATAN (Tidak Berubah) --}}
+                {{-- KOLOM KANAN --}}
                 <div class="space-y-6 lg:col-span-1">
+
+{{-- ... (Bagian Header dan Kolom Kiri SAMA) ... --}}
+
+{{-- KOLOM KANAN --}}
+<div class="space-y-6 lg:col-span-1">
+
+    {{-- KARTU REKOMENDASI HARGA --}}
+    <div class="overflow-hidden bg-white border border-indigo-200 shadow-lg sm:rounded-lg">
+        <div class="p-6 bg-gradient-to-br from-indigo-50 to-white">
+            <h3 class="flex items-center mb-2 text-lg font-bold text-indigo-900">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Analisis Harga Jual
+            </h3>
+            <p class="mb-4 text-xs text-gray-500">Estimasi untung rugi berdasarkan modal.</p>
+
+            <div class="mb-4">
+                <span class="block text-sm font-medium text-gray-500 uppercase">Rekomendasi Harga</span>
+                <span class="block text-3xl font-extrabold text-green-600">
+                    Rp {{ number_format($priceData['rekomendasi'], 0, ',', '.') }}
+                </span>
+            </div>
+
+            <div class="pt-3 space-y-2 text-sm border-t">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Nilai Daging ({{ $priceData['berat_kg'] }}kg)</span>
+                    <span class="font-semibold">Rp {{ number_format($priceData['nilai_daging'], 0, ',', '.') }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Total Modal (Beli+Biaya)</span>
+                    <span class="font-semibold text-red-500">Rp {{ number_format($priceData['total_modal'], 0, ',', '.') }}</span>
+                </div>
+
+                @if($priceData['bonus'] > 0)
+                    <div class="flex justify-between text-green-600">
+                        <span>Bonus Bibit Unggul</span>
+                        <span class="font-bold">+ Rp {{ number_format($priceData['bonus'], 0, ',', '.') }}</span>
+                    </div>
+                @endif
+
+                @if($priceData['penalti'] > 0)
+                    <div class="flex justify-between text-red-600">
+                        <span>Penalti Sakit</span>
+                        <span class="font-bold">- Rp {{ number_format($priceData['penalti'], 0, ',', '.') }}</span>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    {{-- ... (Bagian Status Kesehatan SAMA) ... --}}
+</div>
+                    {{-- STATUS KESEHATAN (Tidak Berubah) --}}
                     <div class="overflow-hidden bg-white border-t-4 border-red-500 shadow-sm sm:rounded-lg">
                         <div class="p-6 text-gray-900">
                             <h3 class="mb-4 text-lg font-bold">Status Kesehatan</h3>
-
                             <a href="{{ route('sheep.health-records.create', $sheep) }}" class="block w-full px-4 py-2 mb-4 font-bold text-center text-white bg-red-600 rounded hover:bg-red-700">
                                 + Lapor Sakit / Penanganan
                             </a>
-
                             <div class="space-y-4">
                                 @forelse($healthRecords as $health)
                                     <div class="border rounded-md p-3 {{ $health->card_style }}">
@@ -412,21 +475,17 @@
                                             </span>
                                         </div>
                                         <h4 class="mt-2 text-sm font-bold">{{ $health->diagnosis }}</h4>
-
                                         <div class="flex flex-wrap gap-1 mt-1">
                                             @foreach($health->symptoms as $sym)
                                                 <span class="text-[10px] bg-white border border-gray-300 px-1 rounded text-gray-600">{{ $sym->name }}</span>
                                             @endforeach
                                         </div>
-
                                         <p class="mt-2 text-xs italic text-gray-600">
                                             "{{ Str::limit($health->treatment_details, 50) }}"
                                         </p>
-
                                         <div class="flex justify-end mt-2">
                                             <form action="{{ route('health-records.destroy', $health) }}" method="POST" onsubmit="return confirm('Hapus riwayat sakit ini?');">
-                                                @csrf
-                                                @method('DELETE')
+                                                @csrf @method('DELETE')
                                                 <button type="submit" class="text-xs text-red-500 hover:text-red-700">Hapus</button>
                                             </form>
                                         </div>
@@ -444,13 +503,11 @@
         </div>
     </div>
 
-    {{-- MODAL POPUP QR CODE --}}
+    {{-- MODAL POPUP QR CODE (Tidak Berubah) --}}
     <div id="qrModal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-black bg-opacity-50">
         <div class="w-full max-w-sm p-6 text-center bg-white rounded-lg shadow-lg">
             <h3 class="mb-4 text-lg font-bold">QR Code Domba: {{ $sheep->tag_number }}</h3>
             <div class="flex justify-center mb-4">
-                {{-- Generate QR Code --}}
-                {{-- PERBAIKAN: Gunakan Full Namespace untuk menghindari error 'Class not found' --}}
                 {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::size(200)->generate(route('sheep.show', $sheep)) !!}
             </div>
             <p class="mb-4 text-sm text-gray-500">Scan untuk membuka profil domba ini.</p>

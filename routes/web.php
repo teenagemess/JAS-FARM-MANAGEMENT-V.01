@@ -6,18 +6,20 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ShelterController;
 use App\Http\Controllers\SymptomController;
 use App\Http\Controllers\FeedTypeController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HealthRecordController;
 use App\Http\Controllers\WeightRecordController;
 use App\Http\Controllers\FeedingRecordController;
+use App\Http\Controllers\ProfitLossRecordController;
 use App\Http\Controllers\ReproductionRecordController;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -51,6 +53,8 @@ Route::middleware('auth')->group(function () {
     Route::resource('feed-types', FeedTypeController::class)->except(['show']);
 
     Route::resource('feeding-records', FeedingRecordController::class);
+
+    Route::resource('profit-loss', ProfitLossRecordController::class)->except(['show', 'edit', 'update']);
 });
 
 require __DIR__.'/auth.php';

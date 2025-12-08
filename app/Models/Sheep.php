@@ -127,4 +127,9 @@ class Sheep extends Model
         // Mencari di ReproductionRecord dengan FK 'male_sheep_id'
         return $this->hasMany(ReproductionRecord::class, 'male_sheep_id');
     }
+
+    public function profitLossRecords(): HasMany
+    {
+        return $this->hasMany(ProfitLossRecord::class);
+    }
 }

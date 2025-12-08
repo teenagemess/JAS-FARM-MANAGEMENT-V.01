@@ -34,13 +34,17 @@ class WeightRecordController extends Controller
 
     /**
      * Menghapus data timbangan.
+     * PERBAIKAN: Ubah nama parameter menjadi $weight (sesuai resource 'sheep.weights')
      */
-    public function destroy(WeightRecord $weightRecord)
+    public function destroy(WeightRecord $weight)
     {
-        $sheepId = $weightRecord->sheep_id;
-        $weightRecord->delete();
+        // Ambil ID domba sebelum dihapus untuk redirect
+        $sheepId = $weight->sheep_id;
 
-        return redirect()->route('sheep.show', $sheepId)
+        $weight->delete();
+
+        // Gunakan array ['sheep' => $id] agar lebih eksplisit dan aman
+        return redirect()->route('sheep.show', ['sheep' => $sheepId])
                          ->with('success', 'Data timbangan berhasil dihapus.');
     }
 }

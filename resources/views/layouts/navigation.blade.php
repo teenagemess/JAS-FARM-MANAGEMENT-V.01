@@ -24,6 +24,9 @@
                     <x-nav-link :href="route('shelters.index')" :active="request()->routeIs('shelters.*')">
                         {{ __('Kandang') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('profit-loss.index')" :active="request()->routeIs('profit-loss.*')">
+                        {{ __('Pencatatan Keuangan') }}
+                    </x-nav-link>
 
                     <!-- DROPDOWN KATEGORI (Desktop) -->
                     <div class="hidden sm:flex sm:items-center sm:ms-6">
@@ -113,6 +116,9 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('shelters.index')" :active="request()->routeIs('shelters.*')">
                 {{ __('Kandang') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('profit-loss.index')" :active="request()->routeIs('profit-loss.*')">
+                {{ __('Pencatatan Keungan') }}
             </x-responsive-nav-link>
 
             <!-- DROPDOWN KATEGORI (Responsive) -->
