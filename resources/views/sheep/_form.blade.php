@@ -29,25 +29,31 @@
 </div>
 
 {{-- (2) Baris 2: LOKASI & KEMITRAAN (LOGIKA BARU) --}}
-<div class="grid grid-cols-1 gap-6 p-4 mt-4 border rounded-md md:grid-cols-3 bg-gray-50" x-data="{ status: '{{ old('placement_status', $sheep->placement_status ?? 'Internal') }}' }">
+<div class="grid grid-cols-1 gap-6 p-4 mt-4 border rounded-md md:grid-cols-3 bg-gray-50"
+     x-data="{ status: '{{ $isPartner ? 'Internal' : old('placement_status', $sheep->placement_status ?? 'Internal') }}' }">
 
-    {{-- Pilihan Status --}}
-    <div class="md:col-span-3">
-        <label class="block mb-2 text-sm font-medium text-gray-700">Status Penempatan</label>
-        <div class="flex gap-4">
-            <label class="inline-flex items-center">
-                <input type="radio" name="placement_status" value="Internal" x-model="status" class="text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                <span class="ml-2 text-gray-700">Internal (Kandang Sendiri)</span>
-            </label>
-            <label class="inline-flex items-center">
-                <input type="radio" name="placement_status" value="Partner" x-model="status" class="text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                <span class="ml-2 text-gray-700">Mitra (Titip Ternak / Gaduh)</span>
-            </label>
+    {{-- Pilihan Status (HANYA MUNCUL UNTUK ADMIN) --}}
+    @if(!$isPartner)
+        <div class="md:col-span-3">
+            <label class="block mb-2 text-sm font-medium text-gray-700">Status Penempatan</label>
+            <div class="flex gap-4">
+                <label class="inline-flex items-center">
+                    <input type="radio" name="placement_status" value="Internal" x-model="status" class="text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                    <span class="ml-2 text-gray-700">Internal (Kandang Sendiri)</span>
+                </label>
+                <label class="inline-flex items-center">
+                    <input type="radio" name="placement_status" value="Partner" x-model="status" class="text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                    <span class="ml-2 text-gray-700">Mitra (Titip Ternak / Gaduh)</span>
+                </label>
+            </div>
+            <x-input-error :messages="$errors->get('placement_status')" class="mt-2" />
         </div>
-        <x-input-error :messages="$errors->get('placement_status')" class="mt-2" />
-    </div>
+    @else
+        {{-- UNTUK MITRA: Otomatis set status Internal (agar validasi kandang jalan) --}}
+        <input type="hidden" name="placement_status" value="Internal">
+    @endif
 
-    {{-- Dropdown Kandang (Muncul jika Internal) --}}
+    {{-- Dropdown Kandang (Muncul jika Internal / Selalu Muncul utk Mitra) --}}
     <div x-show="status === 'Internal'">
         <x-input-label for="shelter_id" :value="__('Pilih Kandang (Wajib)')" />
         <select id="shelter_id" name="shelter_id" class="block w-full mt-1 border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500" onchange="if(typeof checkCapacity === 'function') checkCapacity(this.value)">
@@ -62,20 +68,22 @@
         <x-input-error :messages="$errors->get('shelter_id')" class="mt-2" />
     </div>
 
-    {{-- Dropdown Mitra (Muncul jika Partner) --}}
-    <div x-show="status === 'Partner'" style="display: none;">
-        <x-input-label for="partner_id" :value="__('Pilih Mitra (Wajib)')" />
-        <select id="partner_id" name="partner_id" class="block w-full mt-1 border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-            <option value="">-- Pilih Nama Mitra --</option>
-            @foreach($partners as $partner)
-                <option value="{{ $partner->id }}" {{ old('partner_id', $sheep->partner_id ?? '') == $partner->id ? 'selected' : '' }}>
-                    {{ $partner->name }}
-                </option>
-            @endforeach
-        </select>
-        <p class="mt-1 text-xs text-gray-500">Domba akan tercatat di lokasi mitra ini.</p>
-        <x-input-error :messages="$errors->get('partner_id')" class="mt-2" />
-    </div>
+    {{-- Dropdown Mitra (HANYA MUNCUL UNTUK ADMIN jika pilih Partner) --}}
+    @if(!$isPartner)
+        <div x-show="status === 'Partner'" style="display: none;">
+            <x-input-label for="partner_id" :value="__('Pilih Mitra (Wajib)')" />
+            <select id="partner_id" name="partner_id" class="block w-full mt-1 border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                <option value="">-- Pilih Nama Mitra --</option>
+                @foreach($partners as $partner)
+                    <option value="{{ $partner->id }}" {{ old('partner_id', $sheep->partner_id ?? '') == $partner->id ? 'selected' : '' }}>
+                        {{ $partner->name }}
+                    </option>
+                @endforeach
+            </select>
+            <p class="mt-1 text-xs text-gray-500">Domba akan tercatat di lokasi mitra ini.</p>
+            <x-input-error :messages="$errors->get('partner_id')" class="mt-2" />
+        </div>
+    @endif
 
 </div>
 

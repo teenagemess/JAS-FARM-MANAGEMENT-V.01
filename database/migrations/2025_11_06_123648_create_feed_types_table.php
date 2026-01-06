@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('feed_types', function (Blueprint $table) {
             $table->id();
-            $table->string('name')->unique(); // Contoh: Rumput Gajah, Konsentrat A
+            $table->string('name'); // Contoh: Rumput Gajah, Konsentrat A
             $table->string('unit')->comment('Satuan pengukuran: KG, Karung, Liter, dll.');
             $table->text('notes')->nullable();
             $table->timestamps();

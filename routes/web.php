@@ -88,6 +88,16 @@ Route::middleware('auth')->group(function () {
 
     // 9. Keuangan
     Route::resource('profit-loss', ProfitLossRecordController::class)->except(['show', 'edit', 'update', 'destroy']);
+
+        // Rute untuk Request Penempatan (Hanya bisa diakses Mitra untuk ACC/Reject)
+    Route::get('/placement-requests', [App\Http\Controllers\PlacementRequestController::class, 'index'])
+        ->name('placement-requests.index');
+
+    Route::post('/placement-requests/{id}/approve', [App\Http\Controllers\PlacementRequestController::class, 'approve'])
+        ->name('placement-requests.approve');
+
+    Route::post('/placement-requests/{id}/reject', [App\Http\Controllers\PlacementRequestController::class, 'reject'])
+        ->name('placement-requests.reject');
 });
 
 require __DIR__ . '/auth.php';

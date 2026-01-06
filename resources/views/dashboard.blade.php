@@ -66,20 +66,29 @@
                 </div>
             </div>
 
-            {{-- BAGIAN 2: GRAFIK STATISTIK --}}
-            <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {{-- BAGIAN 2: GRAFIK STATISTIK (UPDATE GRID) --}}
+            {{-- Mengubah grid menjadi 3 kolom agar muat untuk Pie Chart --}}
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 
-                {{-- Grafik Keuangan (SEKARANG MUNCUL UNTUK SEMUA) --}}
-                <div class="p-4 overflow-hidden bg-white shadow-sm sm:rounded-lg">
+                {{-- Grafik Keuangan (Lebar 2 kolom di layar besar) --}}
+                <div class="p-4 overflow-hidden bg-white shadow-sm sm:rounded-lg lg:col-span-2">
                     <h3 class="mb-4 font-bold text-gray-700">📊 Arus Kas Tahun Ini</h3>
                     <div class="relative w-full h-64">
                         <canvas id="financialChart"></canvas>
                     </div>
                 </div>
 
-                {{-- Grafik Pertumbuhan --}}
+                {{-- Grafik Komposisi Pengeluaran (BARU - Pie Chart) --}}
                 <div class="p-4 overflow-hidden bg-white shadow-sm sm:rounded-lg">
-                    <h3 class="mb-4 font-bold text-gray-700">📈 Tren Populasi Domba {{ Auth::user()->role === 'mitra' ? 'Anda' : '' }}</h3>
+                    <h3 class="mb-4 font-bold text-gray-700">🍰 Komposisi Pengeluaran</h3>
+                    <div class="relative w-full h-64">
+                        <canvas id="expensePieChart"></canvas>
+                    </div>
+                </div>
+
+                {{-- Grafik Pertumbuhan --}}
+                <div class="p-4 overflow-hidden bg-white shadow-sm sm:rounded-lg lg:col-span-3">
+                    <h3 class="mb-4 font-bold text-gray-700">📈 Tren Populasi Domba Baru</h3>
                     <div class="relative w-full h-64">
                         <canvas id="growthChart"></canvas>
                     </div>
@@ -90,10 +99,8 @@
             {{-- BAGIAN 3: PERINGATAN & DAFTAR --}}
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
-                {{-- KOLOM KIRI: PERLU PERHATIAN --}}
+                {{-- KOLOM KIRI --}}
                 <div class="space-y-6">
-
-                    {{-- Tabel Sakit --}}
                     <div class="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                         <div class="flex items-center justify-between p-4 border-b border-gray-100 bg-red-50">
                             <h3 class="font-bold text-red-800">⚠️ Perlu Perawatan (Sakit)</h3>
@@ -125,7 +132,6 @@
                         </div>
                     </div>
 
-                    {{-- Tabel Hamil --}}
                     <div class="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                         <div class="flex items-center justify-between p-4 border-b border-gray-100 bg-purple-50">
                             <h3 class="font-bold text-purple-800">🤰 Estimasi Kelahiran Terdekat</h3>
@@ -156,10 +162,9 @@
                             @endforelse
                         </div>
                     </div>
-
                 </div>
 
-                {{-- KOLOM KANAN: AKTIVITAS KEUANGAN (TAMPILKAN UNTUK SEMUA ROLE DULU UNTUK DEBUG) --}}
+                {{-- KOLOM KANAN --}}
                 <div class="overflow-hidden bg-white shadow-sm h-fit sm:rounded-lg">
                     <div class="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50">
                         <h3 class="font-bold text-gray-800">💸 Transaksi Terakhir</h3>
@@ -197,25 +202,23 @@
         </div>
     </div>
 
-    {{-- CHART.JS DARI LOCAL - TARUH SEBELUM </body> --}}
+    {{-- CHART.JS DARI LOCAL --}}
     <script src="{{ asset('js/chart.min.js') }}"></script>
 
-    {{-- SCRIPT UNTUK CHART.JS --}}
     <script>
         document.addEventListener('DOMContentLoaded', function() {
 
-            // PERBAIKAN: Menggunakan !empty() untuk pengecekan data
             const sheepData = @json(array_values(!empty($monthlySheep) ? $monthlySheep : array_fill(0, 12, 0)));
             const incomeData = @json(array_values(!empty($monthlyIncome) ? $monthlyIncome : array_fill(0, 12, 0)));
             const expenseData = @json(array_values(!empty($monthlyExpense) ? $monthlyExpense : array_fill(0, 12, 0)));
 
+            // Data untuk Pie Chart
+            const expenseLabels = @json($expenseLabels ?? []);
+            const expenseTotals = @json($expenseTotals ?? []);
+
             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
-            // Log untuk memastikan data masuk sebagai array angka, bukan string
-            console.log('Processed Income:', incomeData);
-            console.log('Processed Expense:', expenseData);
-
-            // 1. Grafik Keuangan
+            // 1. Grafik Keuangan (Bar)
             const financialCanvas = document.getElementById('financialChart');
             if (financialCanvas) {
                 new Chart(financialCanvas, {
@@ -251,28 +254,48 @@
                                     }
                                 }
                             }
-                        },
+                        }
+                    }
+                });
+            }
+
+            // 2. Grafik Komposisi Pengeluaran (Pie - BARU)
+            const pieCanvas = document.getElementById('expensePieChart');
+            if (pieCanvas && expenseLabels.length > 0) {
+                new Chart(pieCanvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: expenseLabels,
+                        datasets: [{
+                            data: expenseTotals,
+                            backgroundColor: [
+                                '#F87171', '#60A5FA', '#34D399', '#FBBF24', '#A78BFA'
+                            ],
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
                         plugins: {
+                            legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
                             tooltip: {
                                 callbacks: {
                                     label: function(context) {
-                                        let label = context.dataset.label || '';
-                                        if (label) {
-                                            label += ': ';
-                                        }
-                                        if (context.parsed.y !== null) {
-                                            label += new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(context.parsed.y);
-                                        }
-                                        return label;
+                                        let value = context.parsed;
+                                        return ' Rp ' + new Intl.NumberFormat('id-ID').format(value);
                                     }
                                 }
                             }
                         }
                     }
                 });
+            } else if (pieCanvas) {
+                // Tampilkan pesan kosong jika tidak ada data
+                // (Optional: handle empty state visualization)
             }
 
-            // 2. Grafik Pertumbuhan
+            // 3. Grafik Pertumbuhan (Line)
             const growthCanvas = document.getElementById('growthChart');
             if (growthCanvas) {
                 new Chart(growthCanvas, {

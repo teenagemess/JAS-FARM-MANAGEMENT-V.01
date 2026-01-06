@@ -75,7 +75,10 @@
                                     <select class="block w-full mt-1 border-gray-300 rounded-md shadow-sm feed-id-input" required disabled>
                                         <option value="">Pilih Pakan</option>
                                         @foreach($feedTypes as $feed)
-                                            <option value="{{ $feed->id }}" data-unit="{{ $feed->unit }}">{{ $feed->name }}</option>
+                                            {{-- PERUBAHAN: Menampilkan Harga dan Satuan di Label Dropdown --}}
+                                            <option value="{{ $feed->id }}" data-unit="{{ $feed->unit }}">
+                                                {{ $feed->name }} (Rp {{ number_format($feed->price_per_unit, 0, ',', '.') }} / {{ $feed->unit }})
+                                            </option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -102,7 +105,7 @@
                                             KG
                                         </span>
                                     </div>
-                                    <p class="text-[10px] text-gray-500 mt-1">Total: <span class="font-semibold total-quantity">0.00</span> KG</p>
+                                    <p class="text-[10px] text-gray-500 mt-1">Total: <span class="font-semibold total-quantity">0.00</span> <span class="unit-label">KG</span></p>
                                 </div>
 
                                 <div class="col-span-1 text-right">
@@ -175,17 +178,13 @@
             const unitDisplayEvening = itemDiv.querySelector('.feed-unit-display-evening');
             const totalDisplay = itemDiv.querySelector('.total-quantity');
 
+            // Update label unit
             if (unitDisplayMorning) unitDisplayMorning.textContent = unit;
             if (unitDisplayEvening) unitDisplayEvening.textContent = unit;
 
-            // Update unit di tampilan total
-            if (totalDisplay && totalDisplay.parentElement) {
-                // Menghapus teks lama dan menambahkan teks total dengan unit baru
-                const parent = totalDisplay.parentElement;
-                parent.innerHTML = `Total: <span class="font-semibold total-quantity">${totalDisplay.textContent}</span> ${unit}`;
-                // Karena innerHTML direset, kita harus ambil kembali span totalnya
-                parent.querySelector('.total-quantity').textContent = totalDisplay.textContent;
-            }
+            // Update unit text next to total
+            const unitLabel = itemDiv.querySelector('.unit-label');
+            if (unitLabel) unitLabel.textContent = unit;
         }
 
         function addFeedItem() {

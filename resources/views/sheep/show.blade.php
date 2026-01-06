@@ -58,6 +58,21 @@
                                     <h3 class="text-2xl font-bold">Eartag: {{ $sheep->tag_number }}</h3>
 
                                     <div class="flex flex-wrap gap-2">
+                                        {{-- (BARU) BADGE STATUS KEMITRAAN --}}
+                                        @if($sheep->placement_status === 'Partner')
+                                            @if($sheep->partner_id)
+                                                <span class="inline-flex items-center px-3 py-1 text-xs font-bold text-blue-900 bg-blue-100 border border-blue-200 rounded-full shadow-sm">
+                                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                                                    Mitra: {{ $sheep->partner->name ?? 'Unknown' }}
+                                                </span>
+                                            @else
+                                                <span class="inline-flex items-center px-3 py-1 text-xs font-bold text-yellow-800 bg-yellow-100 border border-yellow-200 rounded-full shadow-sm">
+                                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                    Menunggu Konfirmasi Mitra
+                                                </span>
+                                            @endif
+                                        @endif
+
                                         @if($sheep->is_pedigree)
                                             <span class="inline-block px-3 py-1 text-xs font-bold text-yellow-900 bg-yellow-500 rounded-full shadow-md">
                                                 Bibit Unggul
@@ -103,7 +118,23 @@
                                     >
                                 </div>
                                 <div class="space-y-3">
-                                    <p><strong>Kandang:</strong> {{ $sheep->shelter->name ?? 'N/A' }}</p>
+                                    {{-- UPDATE INFO LOKASI/KANDANG --}}
+                                    <p>
+                                        <strong>Lokasi:</strong>
+                                        @if($sheep->placement_status === 'Partner' && $sheep->partner_id)
+                                            <span class="font-semibold text-indigo-700">{{ $sheep->partner->name }}</span>
+                                            @if($sheep->shelter)
+                                                <span class="text-gray-600">({{ $sheep->shelter->name }})</span>
+                                            @else
+                                                <span class="italic text-gray-400">(Belum masuk kandang)</span>
+                                            @endif
+                                        @elseif($sheep->placement_status === 'Partner')
+                                            <span class="italic text-yellow-600">Sedang proses penempatan ke Mitra...</span>
+                                        @else
+                                            {{ $sheep->shelter->name ?? 'Belum ada kandang' }}
+                                        @endif
+                                    </p>
+
                                     <p><strong>Jenis Kelamin:</strong> {{ $sheep->gender }}</p>
                                     <p><strong>Bobot Lahir:</strong> {{ $sheep->birth_weight ? $sheep->birth_weight . ' kg' : '-' }}</p>
                                     <p><strong>Umur:</strong> {{ $sheep->date_of_birth->diffForHumans(null, true) }} (Lahir: {{ $sheep->date_of_birth->format('d M Y') }})</p>

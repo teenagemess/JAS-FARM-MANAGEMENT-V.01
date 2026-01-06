@@ -3,10 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Shelter;
+use App\Models\User; // Tambahkan Model User
 use App\Http\Requests\StoreShelterRequest;
 use App\Http\Requests\UpdateShelterRequest;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Http\Request; // (1) Tambahkan Import Request
+use Illuminate\Http\Request;
 
 class ShelterController extends Controller
 {
@@ -15,8 +16,32 @@ class ShelterController extends Controller
      */
     public function index(Request $request)
     {
-        // Gunakan withCount('sheep') agar kita bisa mengurutkan berdasarkan jumlah domba
-        $query = Shelter::withCount('sheep');
+        $user = Auth::user();
+
+        // Gunakan withCount('sheep') untuk sorting
+        // Gunakan with('user') untuk efisiensi menampilkan nama pemilik di badge
+        $query = Shelter::withCount('sheep')->with('user');
+
+        // --- LOGIKA FILTER USER (Sama seperti FeedingRecord) ---
+        if ($user->role === 'mitra') {
+            // SKENARIO 1: MITRA
+            // Mutlak hanya melihat kandang miliknya sendiri
+            $query->where('user_id', $user->id);
+        } else {
+            // SKENARIO 2: ADMIN
+            if ($request->filled('partner_id')) {
+                // Cek apakah Admin memilih "Semua Data"
+                if ($request->partner_id === 'all') {
+                    // Jangan filter user_id apapun (Tampilkan Semua)
+                } else {
+                    // Filter Mitra Tertentu
+                    $query->where('user_id', $request->partner_id);
+                }
+            } else {
+                // DEFAULT (Jika tidak ada filter): Tampilkan Data Admin Saja
+                $query->where('user_id', $user->id);
+            }
+        }
 
         // 1. Logika Search
         if ($request->filled('search')) {
@@ -48,7 +73,13 @@ class ShelterController extends Controller
         // 3. Pagination (9 per halaman agar pas di grid 3 kolom)
         $shelters = $query->paginate(9)->withQueryString();
 
-        return view('shelters.index', compact('shelters'));
+        // Ambil daftar mitra untuk dropdown filter (Khusus Admin)
+        $partners = [];
+        if ($user->role !== 'mitra') {
+            $partners = User::where('role', 'mitra')->orderBy('name')->get(['id', 'name']);
+        }
+
+        return view('shelters.index', compact('shelters', 'partners'));
     }
 
     /**
@@ -65,7 +96,7 @@ class ShelterController extends Controller
     public function store(StoreShelterRequest $request)
     {
         $data = $request->validated();
-        $data['user_id'] = Auth::id(); // Tambahkan user ID yang input
+        $data['user_id'] = Auth::id(); // Tambahkan user ID yang input (Mitra/Admin)
 
         Shelter::create($data);
 
@@ -77,6 +108,9 @@ class ShelterController extends Controller
      */
     public function edit(Shelter $shelter)
     {
+        // SECURITY CHECK: Pastikan mitra tidak mengedit kandang orang lain
+        $this->authorizeAccess($shelter);
+
         return view('shelters.edit', compact('shelter'));
     }
 
@@ -85,6 +119,9 @@ class ShelterController extends Controller
      */
     public function update(UpdateShelterRequest $request, Shelter $shelter)
     {
+        // SECURITY CHECK
+        $this->authorizeAccess($shelter);
+
         $shelter->update($request->validated());
 
         return redirect()->route('shelters.index')->with('success', 'Data Kandang berhasil diperbarui!');
@@ -95,6 +132,9 @@ class ShelterController extends Controller
      */
     public function destroy(Shelter $shelter)
     {
+        // SECURITY CHECK
+        $this->authorizeAccess($shelter);
+
         // PENTING: Cek apakah kandang memiliki domba aktif sebelum dihapus
         if ($shelter->sheep()->count() > 0) {
             return redirect()->route('shelters.index')->with('error', 'Kandang tidak dapat dihapus karena masih menampung domba!');
@@ -110,12 +150,28 @@ class ShelterController extends Controller
      */
     public function getCapacity(Shelter $shelter)
     {
+        // SECURITY CHECK: Agar mitra lain tidak bisa intip kapasitas kandang orang lain via API
+        $this->authorizeAccess($shelter);
+
         // Mengembalikan data JSON
         return response()->json([
             'name' => $shelter->name,
             'capacity' => $shelter->capacity,
-            'current' => $shelter->current_count, // Menggunakan accessor yang sudah dibuat di Model
+            'current' => $shelter->current_count,
             'remaining' => $shelter->capacity - $shelter->current_count
         ]);
+    }
+
+    /**
+     * Helper Function: Proteksi Akses Mitra ke Kandang
+     */
+    private function authorizeAccess(Shelter $shelter)
+    {
+        $user = Auth::user();
+
+        // Jika user adalah Mitra DAN user_id kandang tidak sama dengan ID user
+        if ($user->role === 'mitra' && $shelter->user_id !== $user->id) {
+            abort(403, 'Anda tidak memiliki akses ke data kandang ini.');
+        }
     }
 }

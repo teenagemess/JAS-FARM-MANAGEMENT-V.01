@@ -45,12 +45,18 @@ class DashboardController extends Controller
         $currentMonth = Carbon::now()->month;
         $currentYear = Carbon::now()->year;
 
-        $incomeThisMonth = ProfitLossRecord::whereMonth('date', $currentMonth)
+        // Filter user_id untuk keuangan (agar mitra hanya lihat uangnya sendiri)
+        $financeQuery = ProfitLossRecord::query();
+        if ($isPartner) {
+            $financeQuery->where('user_id', $user->id);
+        }
+
+        $incomeThisMonth = (clone $financeQuery)->whereMonth('date', $currentMonth)
             ->whereYear('date', $currentYear)
             ->where('type', 'income')
             ->sum('amount');
 
-        $expenseThisMonth = ProfitLossRecord::whereMonth('date', $currentMonth)
+        $expenseThisMonth = (clone $financeQuery)->whereMonth('date', $currentMonth)
             ->whereYear('date', $currentYear)
             ->where('type', 'expense')
             ->sum('amount');
@@ -62,8 +68,8 @@ class DashboardController extends Controller
         $monthlyExpense = array_fill(1, 12, 0);
         $monthlySheep = array_fill(1, 12, 0);
 
-        // QUERY DATA KEUANGAN PER BULAN
-        $financials = ProfitLossRecord::select(
+        // QUERY DATA KEUANGAN PER BULAN (TREN)
+        $financials = (clone $financeQuery)->select(
                 DB::raw('MONTH(date) as month'),
                 'type',
                 DB::raw('SUM(amount) as total')
@@ -72,7 +78,6 @@ class DashboardController extends Controller
             ->groupBy('month', 'type')
             ->get();
 
-        // PROSES DATA KEUANGAN KE ARRAY
         foreach ($financials as $record) {
             if ($record->type === 'income') {
                 $monthlyIncome[$record->month] = (float) $record->total;
@@ -80,6 +85,19 @@ class DashboardController extends Controller
                 $monthlyExpense[$record->month] = (float) $record->total;
             }
         }
+
+        // --- TAMBAHAN BARU: DATA KATEGORI PENGELUARAN (PIE CHART) ---
+        $expenseCategories = (clone $financeQuery)
+            ->select('category', DB::raw('SUM(amount) as total'))
+            ->where('type', 'expense')
+            ->whereYear('date', $currentYear)
+            ->groupBy('category')
+            ->orderByDesc('total')
+            ->limit(5) // Ambil 5 kategori terbesar
+            ->get();
+
+        $expenseLabels = $expenseCategories->pluck('category');
+        $expenseTotals = $expenseCategories->pluck('total');
 
         // QUERY DATA PERTUMBUHAN DOMBA PER BULAN
         $sheepGrowth = Sheep::select(
@@ -91,7 +109,6 @@ class DashboardController extends Controller
             ->groupBy('month')
             ->get();
 
-        // PROSES DATA PERTUMBUHAN DOMBA KE ARRAY
         foreach ($sheepGrowth as $record) {
             $monthlySheep[$record->month] = $record->total;
         }
@@ -121,31 +138,15 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
-        // Transaksi Terakhir
-        $recentTransactions = ProfitLossRecord::latest('date')->limit(5)->get();
-
-        // Tentukan Judul Dashboard
+        $recentTransactions = (clone $financeQuery)->latest('date')->limit(5)->get();
         $dashboardTitle = $isPartner ? 'Dashboard Mitra' : 'Dashboard Peternakan';
 
-        // DEBUG: Uncomment baris ini untuk cek data yang dikirim ke view
-        // dd([
-        //     'monthlyIncome' => $monthlyIncome,
-        //     'monthlyExpense' => $monthlyExpense,
-        //     'monthlySheep' => $monthlySheep
-        // ]);
-
         return view('dashboard', compact(
-            'totalSheep',
-            'activeSicknessCount',
-            'pregnantCount',
-            'balanceThisMonth',
-            'sickSheepList',
-            'pregnantSheepList',
-            'recentTransactions',
-            'monthlyIncome',
-            'monthlyExpense',
-            'monthlySheep',
-            'dashboardTitle'
+            'totalSheep', 'activeSicknessCount', 'pregnantCount', 'balanceThisMonth',
+            'sickSheepList', 'pregnantSheepList', 'recentTransactions',
+            'monthlyIncome', 'monthlyExpense', 'monthlySheep',
+            'dashboardTitle',
+            'expenseLabels', 'expenseTotals' // <-- Variable Baru
         ));
     }
 }

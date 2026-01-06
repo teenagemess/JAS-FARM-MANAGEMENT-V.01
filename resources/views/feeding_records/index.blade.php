@@ -27,6 +27,8 @@
             <div class="p-5 mb-6 bg-white border border-gray-100 shadow-sm rounded-xl">
                 <form method="GET" action="{{ route('feeding-records.index') }}">
                     <div class="grid items-end grid-cols-1 gap-4 md:grid-cols-4">
+
+                        {{-- (A) FILTER TANGGAL --}}
                         <div>
                             <x-input-label for="start_date" :value="__('Dari Tanggal')" />
                             <x-text-input id="start_date" name="start_date" type="date" class="w-full mt-1 text-sm" :value="request('start_date')" />
@@ -35,6 +37,30 @@
                             <x-input-label for="end_date" :value="__('Sampai Tanggal')" />
                             <x-text-input id="end_date" name="end_date" type="date" class="w-full mt-1 text-sm" :value="request('end_date')" />
                         </div>
+
+                        {{-- (B) FILTER KHUSUS ADMIN: PILIH MITRA --}}
+                        {{-- Hanya muncul jika user BUKAN mitra (Admin) --}}
+                        @if(Auth::user()->role !== 'mitra')
+                            <div>
+                                <x-input-label for="partner_id" :value="__('Pilih Data Mitra')" />
+                                <select name="partner_id" id="partner_id" class="w-full mt-1 text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    {{-- PERUBAHAN LABEL & OPSI ALL --}}
+                                    <option value="">-- Data Saya (Admin) --</option>
+                                    <option value="all" {{ request('partner_id') == 'all' ? 'selected' : '' }}>-- Semua Data (All) --</option>
+
+                                    @foreach($partners as $p)
+                                        <option value="{{ $p->id }}" {{ request('partner_id') == $p->id ? 'selected' : '' }}>
+                                            {{ $p->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @else
+                            {{-- Placeholder kosong untuk Mitra agar grid tetap rapi --}}
+                            <div class="hidden md:block"></div>
+                        @endif
+
+                        {{-- (C) FILTER KANDANG --}}
                         <div>
                             <x-input-label for="shelter_id" :value="__('Filter Kandang')" />
                             <select name="shelter_id" id="shelter_id" class="w-full mt-1 text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
@@ -48,13 +74,15 @@
                                 @endif
                             </select>
                         </div>
-                        <div class="flex gap-2">
-                            <x-primary-button type="submit" class="justify-center w-full h-[38px]">
-                                {{ __('Filter') }}
+
+                        {{-- TOMBOL FILTER --}}
+                        <div class="flex justify-end gap-2 mt-2 md:col-span-4">
+                            <x-primary-button type="submit" class="justify-center h-[38px]">
+                                {{ __('Terapkan Filter') }}
                             </x-primary-button>
-                            @if(request()->hasAny(['start_date', 'end_date', 'shelter_id']))
-                                <a href="{{ route('feeding-records.index') }}" class="inline-flex items-center px-3 py-2 text-xs font-semibold tracking-widest text-gray-700 uppercase transition duration-150 ease-in-out bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 active:bg-gray-300 focus:outline-none" title="Reset Filter">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            @if(request()->hasAny(['start_date', 'end_date', 'shelter_id', 'partner_id']))
+                                <a href="{{ route('feeding-records.index') }}" class="inline-flex items-center px-4 py-2 text-xs font-semibold tracking-widest text-gray-700 uppercase transition duration-150 ease-in-out bg-white border border-gray-300 rounded-md hover:bg-gray-50 active:bg-gray-100 focus:outline-none" title="Reset Filter">
+                                    Reset
                                 </a>
                             @endif
                         </div>
@@ -77,6 +105,15 @@
                                     <div class="mt-1 text-xs font-medium text-gray-500">
                                         {{ $record->date->diffForHumans() }}
                                     </div>
+
+                                    {{-- BADGE NAMA MITRA (Khusus Admin) --}}
+                                    {{-- Agar Admin tahu ini data punya siapa --}}
+                                    @if(Auth::user()->role !== 'mitra')
+                                        <div class="flex items-center mt-1 text-xs font-semibold text-indigo-600">
+                                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                                            {{ $record->user->name ?? 'Unknown' }}
+                                        </div>
+                                    @endif
                                 </div>
                                 <span class="inline-flex items-center px-3 py-1 text-xs font-bold text-indigo-700 bg-indigo-100 border border-indigo-200 rounded-full">
                                     🏠 {{ $record->shelter->name }}
@@ -86,13 +123,11 @@
                             {{-- Body --}}
                             <div class="p-5">
                                 <div class="grid h-full grid-cols-2 gap-4">
-                                    {{-- (1) Inisialisasi variabel total biaya DI SINI --}}
                                     @php $totalCostPerCard = 0; @endphp
 
                                     {{-- Kolom Pagi --}}
                                     <div class="pr-2 border-r border-gray-200 border-dashed">
                                         <div class="flex items-center mb-3 text-orange-500">
-                                            {{-- ICON MATAHARI --}}
                                             <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                                             <span class="text-sm font-bold tracking-wide uppercase">Pagi</span>
                                             <span class="ml-auto text-xs font-mono bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded">
@@ -105,12 +140,10 @@
                                                 @if($feed->pivot->quantity_morning > 0)
                                                     @php
                                                         $hasMorning = true;
-                                                        // (2) Hitung biaya (qty pagi * harga) dan tambahkan ke total
                                                         $totalCostPerCard += ($feed->pivot->quantity_morning * ($feed->price_per_unit ?? 0));
                                                     @endphp
                                                     <li class="flex items-start justify-between text-sm text-gray-700">
                                                         <span class="w-16 text-xs text-gray-500 truncate" title="{{ $feed->name }}">{{ $feed->name }}</span>
-                                                        {{-- MENAMPILKAN UNIT --}}
                                                         <span class="font-bold">
                                                             {{ (float)$feed->pivot->quantity_morning }}
                                                             <span class="text-[10px] font-normal text-gray-400">{{ $feed->unit }}</span>
@@ -125,7 +158,6 @@
                                     {{-- Kolom Sore --}}
                                     <div class="pl-2">
                                         <div class="flex items-center mb-3 text-blue-600">
-                                            {{-- ICON BULAN --}}
                                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
                                             <span class="text-sm font-bold tracking-wide uppercase">Sore</span>
                                             <span class="ml-auto text-xs font-mono bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
@@ -138,12 +170,10 @@
                                                 @if($feed->pivot->quantity_evening > 0)
                                                     @php
                                                         $hasEvening = true;
-                                                        // (3) Hitung biaya (qty sore * harga) dan tambahkan ke total
                                                         $totalCostPerCard += ($feed->pivot->quantity_evening * ($feed->price_per_unit ?? 0));
                                                     @endphp
                                                     <li class="flex items-start justify-between text-sm text-gray-700">
                                                         <span class="w-16 text-xs text-gray-500 truncate" title="{{ $feed->name }}">{{ $feed->name }}</span>
-                                                        {{-- MENAMPILKAN UNIT --}}
                                                         <span class="font-bold">
                                                             {{ (float)$feed->pivot->quantity_evening }}
                                                             <span class="text-[10px] font-normal text-gray-400">{{ $feed->unit }}</span>
@@ -158,10 +188,8 @@
                             </div>
                         </a>
 
-                        {{-- FOOTER KARTU (TOMBOL AKSI & CATAT KAS) --}}
+                        {{-- FOOTER KARTU --}}
                         <div class="z-10 flex items-center justify-between px-5 py-3 text-xs border-t border-gray-100 bg-gray-50">
-
-                            {{-- (4) KIRI: Estimasi & Tombol Kas --}}
                             <div class="flex items-center gap-3">
                                 <div class="flex flex-col">
                                     <span class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Estimasi Biaya</span>
@@ -174,7 +202,6 @@
                                     </span>
                                 </div>
 
-                                {{-- (5) TOMBOL CATAT KE KAS (Hanya jika ada biaya > 0) --}}
                                 @if($totalCostPerCard > 0)
                                     <a href="{{ route('profit-loss.create', [
                                         'date' => $record->date->format('Y-m-d'),
@@ -191,7 +218,6 @@
                                 @endif
                             </div>
 
-                            {{-- KANAN: Edit/Hapus --}}
                             <div class="flex items-center space-x-3">
                                 <a href="{{ route('feeding-records.edit', $record) }}" class="font-semibold text-indigo-600 transition-colors hover:text-indigo-800 hover:underline">Edit</a>
                                 <span class="text-gray-300">|</span>
@@ -207,7 +233,13 @@
                 @empty
                     <div class="col-span-1 md:col-span-2 xl:col-span-3">
                          <div class="p-12 text-center bg-white border-2 border-gray-200 border-dashed shadow-sm rounded-xl">
-                            <p class="mt-2 text-lg text-gray-500">Belum ada riwayat pakan.</p>
+                            <p class="mt-2 text-lg text-gray-500">
+                                @if(request()->filled('partner_id') || request()->filled('search'))
+                                    Tidak ada data pakan untuk filter ini.
+                                @else
+                                    Belum ada riwayat pakan.
+                                @endif
+                            </p>
                             <div class="mt-6">
                                 <a href="{{ route('feeding-records.create') }}">
                                     <x-primary-button>{{ __('Catat Pakan Pertama') }}</x-primary-button>

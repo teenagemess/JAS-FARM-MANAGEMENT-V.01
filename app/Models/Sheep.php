@@ -34,6 +34,7 @@ class Sheep extends Model
         'description',
         'placement_status',
         'partner_id',
+        'placement_status',
     ];
 
     protected $casts = [
@@ -138,6 +139,11 @@ class Sheep extends Model
         public function partner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'partner_id');
+    }
+
+        public function latestPlacementRequest(): HasOne
+    {
+        return $this->hasOne(PlacementRequest::class)->latestOfMany();
     }
 
 }

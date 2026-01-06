@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('sheep', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained('users')->onDelete('restrict');
-            $table->foreignId('shelter_id')->constrained('shelters')->onDelete('restrict');
+            $table->foreignId('shelter_id')->nullable()->constrained('shelters')->onDelete('restrict');
 
             // Atribut Identitas & Dasar
             $table->string('tag_number')->unique();

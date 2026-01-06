@@ -37,7 +37,13 @@
                 <div class="relative p-6 overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
                     <div class="absolute top-0 right-0 w-24 h-24 -mt-4 -mr-4 rounded-full opacity-50 bg-gradient-to-br from-indigo-50 to-indigo-100 blur-xl"></div>
                     <div class="relative z-10">
-                        <p class="mb-1 text-sm font-medium tracking-wider text-gray-500 uppercase">Saldo Saat Ini</p>
+                        <p class="mb-1 text-sm font-medium tracking-wider text-gray-500 uppercase">
+                            Saldo
+                            @if(request('partner_id') == 'all') (Gabungan)
+                            @elseif(request('partner_id')) (Mitra Terpilih)
+                            @else (Dompet Saya)
+                            @endif
+                        </p>
                         <h3 class="text-3xl font-extrabold text-gray-900">
                             Rp {{ number_format($balance, 0, ',', '.') }}
                         </h3>
@@ -66,7 +72,7 @@
                         <h3 class="text-2xl font-bold text-green-600">
                             + Rp {{ number_format($totalIncome, 0, ',', '.') }}
                         </h3>
-                        <p class="mt-2 text-xs text-gray-400">Bulan Ini</p>
+                        <p class="mt-2 text-xs text-gray-400">Sesuai Filter</p>
                     </div>
                     <div class="p-3 text-green-600 rounded-full bg-green-50">
                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"></path></svg>
@@ -80,7 +86,7 @@
                         <h3 class="text-2xl font-bold text-red-600">
                             - Rp {{ number_format($totalExpense, 0, ',', '.') }}
                         </h3>
-                        <p class="mt-2 text-xs text-gray-400">Bulan Ini</p>
+                        <p class="mt-2 text-xs text-gray-400">Sesuai Filter</p>
                     </div>
                     <div class="p-3 text-red-600 rounded-full bg-red-50">
                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6"></path></svg>
@@ -88,11 +94,11 @@
                 </div>
             </div>
 
-            {{-- 2. FILTER BAR (MINIMALIS) --}}
+            {{-- 2. FILTER BAR (DENGAN PARTNER SELECT) --}}
             <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
                 <div class="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50">
                     <h3 class="text-sm font-bold tracking-wide text-gray-700 uppercase">Filter Transaksi</h3>
-                    @if(request()->hasAny(['start_date', 'end_date', 'type']))
+                    @if(request()->hasAny(['start_date', 'end_date', 'type', 'partner_id']))
                         <a href="{{ route('profit-loss.index') }}" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline">
                             Reset Filter
                         </a>
@@ -100,26 +106,50 @@
                 </div>
                 <div class="p-4">
                     <form method="GET" action="{{ route('profit-loss.index') }}">
-                        <div class="grid items-end grid-cols-1 gap-4 md:grid-cols-12">
-                            <div class="md:col-span-3">
+                        <div class="grid items-end grid-cols-1 gap-4 md:grid-cols-5">
+
+                            {{-- Filter Tanggal --}}
+                            <div>
                                 <label class="block mb-1 text-xs font-medium text-gray-500">Dari Tanggal</label>
                                 <input type="date" name="start_date" value="{{ request('start_date') }}" class="w-full text-sm border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
                             </div>
-                            <div class="md:col-span-3">
+                            <div>
                                 <label class="block mb-1 text-xs font-medium text-gray-500">Sampai Tanggal</label>
                                 <input type="date" name="end_date" value="{{ request('end_date') }}" class="w-full text-sm border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
                             </div>
-                            <div class="md:col-span-3">
+
+                            {{-- Filter Mitra (KHUSUS ADMIN) --}}
+                            @if(Auth::user()->role !== 'mitra' && isset($partners))
+                                <div>
+                                    <label class="block mb-1 text-xs font-medium text-gray-500">Pemilik Dompet</label>
+                                    <select name="partner_id" class="w-full text-sm border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                                        <option value="">-- Data Saya (Admin) --</option>
+                                        <option value="all" {{ request('partner_id') == 'all' ? 'selected' : '' }}>-- Semua Data (All) --</option>
+                                        @foreach($partners as $p)
+                                            <option value="{{ $p->id }}" {{ request('partner_id') == $p->id ? 'selected' : '' }}>
+                                                {{ $p->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @else
+                                <div class="hidden md:block"></div>
+                            @endif
+
+                            {{-- Filter Tipe --}}
+                            <div>
                                 <label class="block mb-1 text-xs font-medium text-gray-500">Jenis Transaksi</label>
                                 <select name="type" class="w-full text-sm border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
                                     <option value="">Semua</option>
-                                    <option value="income" {{ request('type') == 'income' ? 'selected' : '' }}>Pemasukan (Income)</option>
-                                    <option value="expense" {{ request('type') == 'expense' ? 'selected' : '' }}>Pengeluaran (Expense)</option>
+                                    <option value="income" {{ request('type') == 'income' ? 'selected' : '' }}>Pemasukan (+)</option>
+                                    <option value="expense" {{ request('type') == 'expense' ? 'selected' : '' }}>Pengeluaran (-)</option>
                                 </select>
                             </div>
-                            <div class="md:col-span-3">
+
+                            {{-- Tombol --}}
+                            <div>
                                 <button type="submit" class="w-full px-4 py-2 text-sm font-medium text-white transition-colors bg-gray-800 rounded-lg shadow-md hover:bg-gray-900">
-                                    Terapkan Filter
+                                    Terapkan
                                 </button>
                             </div>
                         </div>
@@ -155,15 +185,22 @@
                                     </div>
                                     <p class="mb-2 text-sm text-gray-600">{{ $record->description ?? 'Tidak ada catatan.' }}</p>
 
-                                    {{-- Tag Relasi (Domba/Kandang) --}}
-                                    <div class="flex gap-2">
+                                    {{-- INFO PEMILIK & RELASI --}}
+                                    <div class="flex flex-wrap gap-2">
+                                        {{-- Badge Pemilik (Khusus Admin) --}}
+                                        @if(Auth::user()->role !== 'mitra')
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-gray-200 text-gray-700">
+                                                👤 {{ $record->user->name ?? 'Unknown' }}
+                                            </span>
+                                        @endif
+
                                         @if($record->sheep)
                                             <a href="{{ route('sheep.show', $record->sheep) }}" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors">
                                                 🐑 {{ $record->sheep->tag_number }}
                                             </a>
                                         @endif
                                         @if($record->shelter)
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-700">
                                                 🏠 {{ $record->shelter->name }}
                                             </span>
                                         @endif
@@ -180,7 +217,7 @@
                                     <span class="text-xs text-gray-400 capitalize">{{ $record->type == 'income' ? 'Pemasukan' : 'Pengeluaran' }}</span>
                                 </div>
 
-                                {{-- Tombol Hapus (Muncul saat hover di Desktop, selalu muncul di Mobile) --}}
+                                {{-- Tombol Hapus (Muncul saat hover di Desktop) --}}
                                 <div class="transition-opacity opacity-100 md:opacity-0 md:group-hover:opacity-100">
                                     <form action="{{ route('profit-loss.destroy', $record) }}" method="POST" onsubmit="return confirm('Hapus transaksi ini? Saldo akan dihitung ulang.');">
                                         @csrf

@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Models\Sheep;
 use App\Models\Shelter;
 use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Models\PlacementRequest;
+use App\Models\ProfitLossRecord;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
-use App\Models\User;
 use App\Http\Requests\StoreSheepRequest;
 use App\Http\Requests\UpdateSheepRequest;
-use App\Models\ProfitLossRecord;
 use App\Services\PriceRecommenderService;
 
 class SheepController extends Controller
@@ -22,10 +23,13 @@ class SheepController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $query = Sheep::with('shelter', 'partner');
+        $isPartner = $user->role === 'mitra'; // Cek role
+
+        // UPDATE: Tambahkan 'latestPlacementRequest' agar kita bisa cek status di View
+        $query = Sheep::with(['shelter', 'partner', 'latestPlacementRequest']);
 
         // FILTER SCOPE MITRA
-        if ($user->role === 'mitra') {
+        if ($isPartner) {
             $query->where('partner_id', $user->id);
         }
 
@@ -50,10 +54,16 @@ class SheepController extends Controller
                         ->paginate(12)
                         ->withQueryString();
 
-        $shelters = Shelter::orderBy('name')->get(['id', 'name']);
+        // Filter Kandang di Index juga (untuk dropdown filter)
+        $sheltersQuery = Shelter::orderBy('name');
+        if ($isPartner) {
+            $sheltersQuery->where('user_id', $user->id);
+        }
+        $shelters = $sheltersQuery->get(['id', 'name']);
+
         $categories = Sheep::select('category')->distinct()->pluck('category');
 
-        return view('sheep.index', compact('sheep', 'shelters', 'categories'));
+        return view('sheep.index', compact('sheep', 'shelters', 'categories', 'isPartner'));
     }
 
     /**
@@ -61,12 +71,36 @@ class SheepController extends Controller
      */
     public function create()
     {
-        $shelters = Shelter::orderBy('name')->get();
-        $partners = User::orderBy('name')->get(['id', 'name']);
-        $potential_dams = Sheep::where('gender', 'Betina')->get(['id', 'tag_number']);
-        $potential_sires = Sheep::where('gender', 'Jantan')->get(['id', 'tag_number']);
+        $user = Auth::user();
+        $isPartner = $user->role === 'mitra';
 
-        return view('sheep.create', compact('shelters', 'partners', 'potential_dams', 'potential_sires'));
+        // --- UPDATE: FILTER KANDANG ---
+        $sheltersQuery = Shelter::orderBy('name');
+        if ($isPartner) {
+            $sheltersQuery->where('user_id', $user->id);
+        }
+        $shelters = $sheltersQuery->get();
+
+        // FILTER PARTNER
+        $partnersQuery = User::orderBy('name');
+        if ($isPartner) {
+            $partnersQuery->where('id', $user->id);
+        }
+        $partners = $partnersQuery->get(['id', 'name']);
+
+        // FILTER INDUKAN
+        $damsQuery = Sheep::where('gender', 'Betina');
+        $siresQuery = Sheep::where('gender', 'Jantan');
+
+        if ($isPartner) {
+            $damsQuery->where('partner_id', $user->id);
+            $siresQuery->where('partner_id', $user->id);
+        }
+
+        $potential_dams = $damsQuery->get(['id', 'tag_number']);
+        $potential_sires = $siresQuery->get(['id', 'tag_number']);
+
+        return view('sheep.create', compact('shelters', 'partners', 'potential_dams', 'potential_sires', 'isPartner'));
     }
 
     /**
@@ -74,21 +108,52 @@ class SheepController extends Controller
      */
     public function store(StoreSheepRequest $request)
     {
+        $user = Auth::user();
         $data = $request->validated();
+        $targetPartnerId = null;
 
         if ($request->hasFile('photo')) {
             $path = $request->file('photo')->store('sheep_photos', 'public');
             $data['photo_path'] = $path;
         }
 
-        $data['user_id'] = Auth::id();
+        $data['user_id'] = $user->id;
 
-        // Simpan data domba
+        // --- LOGIKA REQUEST PENEMPATAN ---
+        if ($user->role === 'mitra') {
+            // Mitra input sendiri -> Langsung jadi miliknya
+            $data['partner_id'] = $user->id;
+            $data['placement_status'] = 'Internal'; // Mitra mengelola sendiri = Internal bagi Mitra
+        } else {
+            // ADMIN INPUT
+            $placementStatus = $request->input('placement_status', 'Internal');
+
+            if ($placementStatus === 'Partner') {
+                $targetPartnerId = $request->input('partner_id');
+                $data['partner_id'] = null;
+                $data['shelter_id'] = null;
+                $data['placement_status'] = 'Partner';
+            } else {
+                // Internal Admin
+                $data['partner_id'] = null;
+            }
+        }
+
+        // 1. Buat Domba
         $sheep = Sheep::create($data);
 
-        // PERUBAHAN: Logika otomatisasi pencatatan keuangan dihapus.
-        // Sekarang harga beli hanya tersimpan di data domba sebagai referensi nilai aset.
-        // Jika ingin mencatat pengeluaran kas, silakan lakukan manual di menu Keuangan.
+        // 2. Jika Admin & Target Mitra ada -> Buat Request
+        if ($user->role !== 'mitra' && $targetPartnerId) {
+            PlacementRequest::create([
+                'sheep_id' => $sheep->id,
+                'requester_id' => $user->id,
+                'target_partner_id' => $targetPartnerId,
+                'status' => 'pending',
+                'notes' => 'Penempatan baru dari Admin'
+            ]);
+
+            return redirect()->route('sheep.index')->with('success', 'Domba dibuat. Permintaan persetujuan dikirim ke Mitra.');
+        }
 
         return redirect()->route('sheep.index')->with('success', 'Data domba baru berhasil ditambahkan.');
     }
@@ -98,7 +163,9 @@ class SheepController extends Controller
      */
     public function show(Sheep $sheep)
     {
-        $sheep->load(['shelter', 'mother', 'father', 'partner']);
+        $this->authorizeAccess($sheep);
+
+        $sheep->load(['shelter', 'mother', 'father', 'partner', 'latestPlacementRequest']);
 
         $recommender = new PriceRecommenderService();
         $priceData = $recommender->calculate($sheep);
@@ -122,13 +189,37 @@ class SheepController extends Controller
      */
     public function edit(Sheep $sheep)
     {
-        $shelters = Shelter::orderBy('name')->get();
-        $partners = User::orderBy('name')->get(['id', 'name']);
-        $potential_dams = Sheep::where('gender', 'Betina')->where('id', '!=', $sheep->id)->get(['id', 'tag_number']);
-        $potential_sires = Sheep::where('gender', 'Jantan')->where('id', '!=', $sheep->id)->get(['id', 'tag_number']);
+        $this->authorizeAccess($sheep);
+
+        $user = Auth::user();
+        $isPartner = $user->role === 'mitra';
+
+        $sheltersQuery = Shelter::orderBy('name');
+        if ($isPartner) {
+            $sheltersQuery->where('user_id', $user->id);
+        }
+        $shelters = $sheltersQuery->get();
+
+        $partnersQuery = User::orderBy('name');
+        if ($isPartner) {
+            $partnersQuery->where('id', $user->id);
+        }
+        $partners = $partnersQuery->get(['id', 'name']);
+
+        $damsQuery = Sheep::where('gender', 'Betina')->where('id', '!=', $sheep->id);
+        $siresQuery = Sheep::where('gender', 'Jantan')->where('id', '!=', $sheep->id);
+
+        if ($isPartner) {
+            $damsQuery->where('partner_id', $user->id);
+            $siresQuery->where('partner_id', $user->id);
+        }
+
+        $potential_dams = $damsQuery->get(['id', 'tag_number']);
+        $potential_sires = $siresQuery->get(['id', 'tag_number']);
+
         $tagSuffix = str_replace('JAS-', '', $sheep->tag_number);
 
-        return view('sheep.edit', compact('sheep', 'shelters', 'partners', 'potential_dams', 'potential_sires', 'tagSuffix'));
+        return view('sheep.edit', compact('sheep', 'shelters', 'partners', 'potential_dams', 'potential_sires', 'tagSuffix', 'isPartner'));
     }
 
     /**
@@ -136,14 +227,37 @@ class SheepController extends Controller
      */
     public function update(UpdateSheepRequest $request, Sheep $sheep)
     {
+        $this->authorizeAccess($sheep);
+        $user = Auth::user();
         $data = $request->validated();
 
         if ($request->hasFile('photo')) {
-            if ($sheep->photo_path) {
-                Storage::disk('public')->delete($sheep->photo_path);
-            }
+            if ($sheep->photo_path) { Storage::disk('public')->delete($sheep->photo_path); }
             $path = $request->file('photo')->store('sheep_photos', 'public');
             $data['photo_path'] = $path;
+        }
+
+        if ($user->role === 'mitra') {
+            unset($data['partner_id']);
+        } else {
+            $placementStatus = $request->input('placement_status', 'Internal');
+
+            if ($placementStatus === 'Partner') {
+                $newPartnerId = $request->input('partner_id');
+                if ($newPartnerId && $newPartnerId != $sheep->partner_id) {
+                    PlacementRequest::create([
+                        'sheep_id' => $sheep->id,
+                        'requester_id' => $user->id,
+                        'target_partner_id' => $newPartnerId,
+                        'status' => 'pending',
+                        'notes' => 'Pemindahan domba dari Admin'
+                    ]);
+                    $data['partner_id'] = null;
+                    $data['shelter_id'] = null;
+                }
+            } else {
+                $data['partner_id'] = null;
+            }
         }
 
         $sheep->update($data);
@@ -151,36 +265,29 @@ class SheepController extends Controller
         return redirect()->route('sheep.show', $sheep)->with('success', 'Data domba berhasil diperbarui.');
     }
 
-    /**
-     * Cetak Kartu Ternak (PDF)
-     */
     public function printCard(Sheep $sheep)
     {
+        $this->authorizeAccess($sheep);
         $sheep->load(['shelter', 'mother', 'father', 'healthRecords', 'weightRecords']);
-
-        $data = [
-            'sheep' => $sheep,
-            'farm_name' => 'JAS Farm Sinergi',
-            'print_date' => now()->format('d F Y'),
-        ];
-
+        $data = ['sheep' => $sheep, 'farm_name' => 'JAS Farm Sinergi', 'print_date' => now()->format('d F Y')];
         $pdf = Pdf::loadView('sheep.print_card', $data);
         $pdf->setPaper('a4', 'portrait');
-
         return $pdf->stream('Kartu_Ternak_' . $sheep->tag_number . '.pdf');
     }
 
-    /**
-     * Menghapus data domba.
-     */
     public function destroy(Sheep $sheep)
     {
-        if ($sheep->photo_path) {
-            Storage::disk('public')->delete($sheep->photo_path);
-        }
-
+        $this->authorizeAccess($sheep);
+        if ($sheep->photo_path) { Storage::disk('public')->delete($sheep->photo_path); }
         $sheep->delete();
-
         return redirect()->route('sheep.index')->with('success', 'Data domba berhasil dihapus.');
+    }
+
+    private function authorizeAccess(Sheep $sheep)
+    {
+        $user = Auth::user();
+        if ($user->role === 'mitra' && $sheep->partner_id !== $user->id) {
+            abort(403, 'Anda tidak memiliki izin untuk mengakses data domba ini.');
+        }
     }
 }
