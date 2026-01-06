@@ -9,55 +9,60 @@ use App\Models\ReproductionRecord;
 use App\Models\ProfitLossRecord;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
     public function index()
     {
-        // === 1. STATISTIK UTAMA ===
-        $totalSheep = Sheep::count();
+        $user = Auth::user();
 
-        // --- PERBAIKAN LOGIKA HITUNG DOMBA SAKIT ---
-        // Ambil semua domba yang punya riwayat kesehatan
-        $sheepsWithHealth = Sheep::whereHas('healthRecords')->with('healthRecords')->get();
+        // --- LOGIKA FILTER BERDASARKAN ROLE ---
+        $isPartner = $user->role === 'mitra';
+        $partnerId = $isPartner ? $user->id : null;
 
-        // Filter: Hanya hitung jika STATUS TERAKHIR-nya sakit
-        $activeSicknessCount = $sheepsWithHealth->filter(function ($sheep) {
-            // Ambil record terakhir (Tanggal terbaru + ID terbesar)
-            $latestRecord = $sheep->healthRecords
-                ->sortByDesc(function ($record) {
-                    return $record->record_date . str_pad($record->id, 10, '0', STR_PAD_LEFT);
-                })
-                ->first();
+        // Base Query untuk Domba
+        $sheepQuery = Sheep::query();
+        $healthQuery = HealthRecord::query();
+        $reproQuery = ReproductionRecord::query();
 
-            // Jika record terakhir ada DAN statusnya BUKAN 'Completed', berarti sakit
-            return $latestRecord && !in_array($latestRecord->status, ['Completed', 'Sembuh / Selesai']);
-        })->count();
+        // Filter: Jika Mitra, scope semua data ke domba yang dititipkan kepadanya
+        if ($isPartner) {
+            $sheepQuery->where('partner_id', $partnerId);
+            $scopedSheepIds = $sheepQuery->pluck('id');
 
+            $healthQuery->whereIn('sheep_id', $scopedSheepIds);
+            $reproQuery->whereIn('female_sheep_id', $scopedSheepIds)
+                       ->orWhereIn('male_sheep_id', $scopedSheepIds);
+        }
 
-        // Hitung domba hamil
-        $pregnantCount = ReproductionRecord::where('status', 'Pregnant')->count();
+        // 1. STATISTIK UTAMA
+        $totalSheep = $sheepQuery->count();
+        $activeSicknessCount = $healthQuery->whereNotIn('status', ['Completed', 'Sembuh / Selesai'])->count();
+        $pregnantCount = $reproQuery->where('status', 'Pregnant')->count();
 
-        // Hitung Keuangan Bulan Ini
+        // KEUANGAN BULAN INI
         $currentMonth = Carbon::now()->month;
         $currentYear = Carbon::now()->year;
 
         $incomeThisMonth = ProfitLossRecord::whereMonth('date', $currentMonth)
-                            ->whereYear('date', $currentYear)
-                            ->where('type', 'income')
-                            ->sum('amount');
+            ->whereYear('date', $currentYear)
+            ->where('type', 'income')
+            ->sum('amount');
 
         $expenseThisMonth = ProfitLossRecord::whereMonth('date', $currentMonth)
-                            ->whereYear('date', $currentYear)
-                            ->where('type', 'expense')
-                            ->sum('amount');
+            ->whereYear('date', $currentYear)
+            ->where('type', 'expense')
+            ->sum('amount');
 
         $balanceThisMonth = $incomeThisMonth - $expenseThisMonth;
 
-        // === 2. DATA UNTUK GRAFIK ===
+        // 2. DATA UNTUK GRAFIK - INISIALISASI ARRAY DENGAN 0
         $monthlyIncome = array_fill(1, 12, 0);
         $monthlyExpense = array_fill(1, 12, 0);
+        $monthlySheep = array_fill(1, 12, 0);
 
+        // QUERY DATA KEUANGAN PER BULAN
         $financials = ProfitLossRecord::select(
                 DB::raw('MONTH(date) as month'),
                 'type',
@@ -67,58 +72,67 @@ class DashboardController extends Controller
             ->groupBy('month', 'type')
             ->get();
 
+        // PROSES DATA KEUANGAN KE ARRAY
         foreach ($financials as $record) {
-            if ($record->type == 'income') {
-                $monthlyIncome[$record->month] = $record->total;
-            } else {
-                $monthlyExpense[$record->month] = $record->total;
+            if ($record->type === 'income') {
+                $monthlyIncome[$record->month] = (float) $record->total;
+            } else if ($record->type === 'expense') {
+                $monthlyExpense[$record->month] = (float) $record->total;
             }
         }
 
-        $monthlySheep = array_fill(1, 12, 0);
+        // QUERY DATA PERTUMBUHAN DOMBA PER BULAN
         $sheepGrowth = Sheep::select(
                 DB::raw('MONTH(created_at) as month'),
                 DB::raw('COUNT(*) as total')
             )
             ->whereYear('created_at', $currentYear)
+            ->when($isPartner, fn($q) => $q->where('partner_id', $partnerId))
             ->groupBy('month')
             ->get();
 
+        // PROSES DATA PERTUMBUHAN DOMBA KE ARRAY
         foreach ($sheepGrowth as $record) {
             $monthlySheep[$record->month] = $record->total;
         }
 
-        // === 3. LIST DATA ===
+        // 3. LIST DATA (Sakit & Hamil)
+        $scopedSheeps = $sheepQuery->with('healthRecords')->get();
 
-        // --- PERBAIKAN LIST DOMBA SAKIT ---
-        // Kita gunakan hasil filter di atas untuk mendapatkan list domba sakit yang valid
-        $sickSheepList = $sheepsWithHealth->filter(function ($sheep) {
+        $sickSheepList = $scopedSheeps->filter(function ($sheep) {
             $latestRecord = $sheep->healthRecords
-                ->sortByDesc(function ($record) {
-                    return $record->record_date . str_pad($record->id, 10, '0', STR_PAD_LEFT);
-                })
+                ->sortByDesc(fn($record) => $record->record_date . str_pad($record->id, 10, '0', STR_PAD_LEFT))
                 ->first();
             return $latestRecord && !in_array($latestRecord->status, ['Completed', 'Sembuh / Selesai']);
-        })->map(function($sheep) {
-            // Map agar yang dikembalikan adalah objek HealthRecord terakhirnya (untuk ditampilkan di view)
-            return $sheep->healthRecords
-                ->sortByDesc(function ($record) {
-                    return $record->record_date . str_pad($record->id, 10, '0', STR_PAD_LEFT);
-                })
-                ->first();
-        })
-        ->sortByDesc('record_date') // Urutkan daftar sakit berdasarkan tanggal kejadian
+        })->map(fn($sheep) => $sheep->healthRecords
+                ->sortByDesc(fn($record) => $record->record_date . str_pad($record->id, 10, '0', STR_PAD_LEFT))
+                ->first()
+        )
+        ->sortByDesc('record_date')
         ->take(5);
 
-
-        // Daftar Domba Hamil Tua
+        // Daftar Domba Hamil
         $pregnantSheepList = ReproductionRecord::with(['dam', 'dam.shelter'])
-                            ->where('status', 'Pregnant')
-                            ->orderBy('expected_delivery_date', 'asc')
-                            ->limit(5)
-                            ->get();
+            ->where('status', 'Pregnant')
+            ->when($isPartner, fn($q) => $q->whereIn('female_sheep_id',
+                $scopedSheeps->where('gender', 'Betina')->pluck('id')
+            ))
+            ->orderBy('expected_delivery_date', 'asc')
+            ->limit(5)
+            ->get();
 
+        // Transaksi Terakhir
         $recentTransactions = ProfitLossRecord::latest('date')->limit(5)->get();
+
+        // Tentukan Judul Dashboard
+        $dashboardTitle = $isPartner ? 'Dashboard Mitra' : 'Dashboard Peternakan';
+
+        // DEBUG: Uncomment baris ini untuk cek data yang dikirim ke view
+        // dd([
+        //     'monthlyIncome' => $monthlyIncome,
+        //     'monthlyExpense' => $monthlyExpense,
+        //     'monthlySheep' => $monthlySheep
+        // ]);
 
         return view('dashboard', compact(
             'totalSheep',
@@ -130,7 +144,8 @@ class DashboardController extends Controller
             'recentTransactions',
             'monthlyIncome',
             'monthlyExpense',
-            'monthlySheep'
+            'monthlySheep',
+            'dashboardTitle'
         ));
     }
 }

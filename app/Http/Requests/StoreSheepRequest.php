@@ -14,7 +14,7 @@ class StoreSheepRequest extends FormRequest
         return true;
     }
 
-        protected function prepareForValidation()
+    protected function prepareForValidation()
     {
         if ($this->tag_number) {
             $this->merge([
@@ -41,7 +41,7 @@ class StoreSheepRequest extends FormRequest
             'type' => 'required|string|max:255',
 
             //Validasi Foreign Key
-            'shelter_id' => 'required|exists:shelters,id',
+            'shelter_id' => 'required_if:placement_status,Internal|nullable|exists:shelters,id',
             'father_id' => 'nullable|exists:sheep,id',
             'mother_id' => 'nullable|exists:sheep,id',
 
@@ -49,7 +49,18 @@ class StoreSheepRequest extends FormRequest
             'is_pedigree' => 'nullable|boolean',
             'special_characteristics' => 'nullable|string',
             'description' => 'nullable|string',
-             'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+
+            'placement_status' => 'required|in:Internal,Partner',
+            'partner_id' => 'required_if:placement_status,Partner|nullable|exists:users,id',
+        ];
+    }
+
+    public function messages()
+    {
+        return [
+            'shelter_id.required_if' => 'Kandang wajib dipilih jika status penempatan adalah Internal.',
+            'partner_id.required_if' => 'Nama Mitra wajib dipilih jika status penempatan adalah Mitra (Partner).',
         ];
     }
 }

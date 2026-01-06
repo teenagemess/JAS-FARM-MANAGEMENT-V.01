@@ -32,9 +32,11 @@ class Sheep extends Model
         'special_characteristics',
         'photo_path',
         'description',
+        'placement_status',
+        'partner_id',
     ];
 
-        protected $casts = [
+    protected $casts = [
         'date_of_birth' => 'datetime',
         'is_pedigree' => 'boolean',
     ];
@@ -132,4 +134,10 @@ class Sheep extends Model
     {
         return $this->hasMany(ProfitLossRecord::class);
     }
+
+        public function partner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'partner_id');
+    }
+
 }

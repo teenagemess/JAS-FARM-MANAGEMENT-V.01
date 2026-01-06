@@ -6,16 +6,47 @@ use App\Models\Shelter;
 use App\Http\Requests\StoreShelterRequest;
 use App\Http\Requests\UpdateShelterRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request; // (1) Tambahkan Import Request
 
 class ShelterController extends Controller
 {
     /**
-     * Menampilkan daftar Kandang dalam format tabel.
+     * Menampilkan daftar Kandang dengan Search, Filter, dan Pagination.
      */
-    public function index()
+    public function index(Request $request)
     {
-        // Muat juga relasi sheep untuk menghitung jumlah domba
-        $shelters = Shelter::with('sheep')->orderBy('name')->get();
+        // Gunakan withCount('sheep') agar kita bisa mengurutkan berdasarkan jumlah domba
+        $query = Shelter::withCount('sheep');
+
+        // 1. Logika Search
+        if ($request->filled('search')) {
+            $query->where('name', 'like', '%' . $request->search . '%');
+        }
+
+        // 2. Logika Sorting
+        if ($request->filled('sort')) {
+            switch ($request->sort) {
+                case 'fullest': // Terisi Paling Banyak
+                    $query->orderByDesc('sheep_count');
+                    break;
+                case 'emptiest': // Paling Kosong
+                    $query->orderBy('sheep_count');
+                    break;
+                case 'capacity_high': // Kapasitas Besar
+                    $query->orderByDesc('capacity');
+                    break;
+                case 'newest': // Terbaru Dibuat
+                    $query->orderByDesc('created_at');
+                    break;
+                default:
+                    $query->orderBy('name');
+            }
+        } else {
+            $query->orderBy('name'); // Default urut nama A-Z
+        }
+
+        // 3. Pagination (9 per halaman agar pas di grid 3 kolom)
+        $shelters = $query->paginate(9)->withQueryString();
 
         return view('shelters.index', compact('shelters'));
     }

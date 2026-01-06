@@ -3,9 +3,10 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
@@ -21,6 +22,9 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
+        'phone',
+        'address',
     ];
 
     /**
@@ -44,5 +48,24 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function hasRole($role)
+    {
+        return $this->role === $role;
+    }
+
+    /**
+     * Helper untuk cek apakah user adalah Admin.
+     */
+    public function isAdmin()
+    {
+        return $this->role === 'admin';
+    }
+
+        public function sheeps(): HasMany
+    {
+        // Domba milik user ini ditandai dengan kolom 'partner_id' di tabel sheep
+        return $this->hasMany(Sheep::class, 'partner_id');
     }
 }

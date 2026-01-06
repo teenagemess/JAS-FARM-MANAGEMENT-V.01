@@ -15,7 +15,7 @@ class UpdateSheepRequest extends FormRequest
         return true; // Izinkan (bisa diubah jika pakai role)
     }
 
-        protected function prepareForValidation()
+    protected function prepareForValidation()
     {
         if ($this->tag_number) {
             $this->merge([
@@ -41,7 +41,7 @@ class UpdateSheepRequest extends FormRequest
                 'max:255',
                 Rule::unique('sheep')->ignore($this->sheep->id), // Abaikan ID domba ini
             ],
-            'shelter_id' => 'required|integer|exists:shelters,id',
+            'shelter_id' => 'required_if:placement_status,Internal|nullable|exists:shelters,id',
             'category' => 'required|string|max:255',
             'type' => 'required|string|max:255',
             'gender' => 'required|in:Jantan,Betina',
@@ -55,6 +55,9 @@ class UpdateSheepRequest extends FormRequest
             'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
 
             'description' => 'nullable|string',
+
+            'placement_status' => 'required|in:Internal,Partner',
+            'partner_id' => 'required_if:placement_status,Partner|nullable|exists:users,id',
         ];
     }
 }

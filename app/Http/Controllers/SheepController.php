@@ -4,13 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\Sheep;
 use App\Models\Shelter;
-use App\Models\ProfitLossRecord; // (1) Impor Model Keuangan
+use Illuminate\Http\Request;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use App\Models\User;
 use App\Http\Requests\StoreSheepRequest;
 use App\Http\Requests\UpdateSheepRequest;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Http\Request;
-use App\Services\PriceRecommenderService; // (BARU) Impor Service
+use App\Models\ProfitLossRecord;
+use App\Services\PriceRecommenderService;
 
 class SheepController extends Controller
 {
@@ -19,8 +21,13 @@ class SheepController extends Controller
      */
     public function index(Request $request)
     {
-        // ... (Logika Index sama) ...
-        $query = Sheep::with('shelter');
+        $user = Auth::user();
+        $query = Sheep::with('shelter', 'partner');
+
+        // FILTER SCOPE MITRA
+        if ($user->role === 'mitra') {
+            $query->where('partner_id', $user->id);
+        }
 
         if ($request->filled('search')) {
             $search = $request->input('search');
@@ -40,8 +47,8 @@ class SheepController extends Controller
         }
 
         $sheep = $query->latest()
-                       ->paginate(12)
-                       ->withQueryString();
+                        ->paginate(12)
+                        ->withQueryString();
 
         $shelters = Shelter::orderBy('name')->get(['id', 'name']);
         $categories = Sheep::select('category')->distinct()->pluck('category');
@@ -55,10 +62,11 @@ class SheepController extends Controller
     public function create()
     {
         $shelters = Shelter::orderBy('name')->get();
+        $partners = User::orderBy('name')->get(['id', 'name']);
         $potential_dams = Sheep::where('gender', 'Betina')->get(['id', 'tag_number']);
         $potential_sires = Sheep::where('gender', 'Jantan')->get(['id', 'tag_number']);
 
-        return view('sheep.create', compact('shelters', 'potential_dams', 'potential_sires'));
+        return view('sheep.create', compact('shelters', 'partners', 'potential_dams', 'potential_sires'));
     }
 
     /**
@@ -75,21 +83,12 @@ class SheepController extends Controller
 
         $data['user_id'] = Auth::id();
 
+        // Simpan data domba
         $sheep = Sheep::create($data);
 
-        // OTOMATIS CATAT PENGELUARAN JIKA ADA HARGA BELI
-        if ($sheep->purchase_price > 0) {
-            ProfitLossRecord::create([
-                'date' => now(),
-                'type' => 'expense',
-                'category' => 'Pembelian Domba',
-                'amount' => $sheep->purchase_price,
-                'description' => "Pembelian Domba Baru: {$sheep->tag_number}",
-                'sheep_id' => $sheep->id,
-                'shelter_id' => $sheep->shelter_id,
-                'user_id' => Auth::id(),
-            ]);
-        }
+        // PERUBAHAN: Logika otomatisasi pencatatan keuangan dihapus.
+        // Sekarang harga beli hanya tersimpan di data domba sebagai referensi nilai aset.
+        // Jika ingin mencatat pengeluaran kas, silakan lakukan manual di menu Keuangan.
 
         return redirect()->route('sheep.index')->with('success', 'Data domba baru berhasil ditambahkan.');
     }
@@ -99,27 +98,22 @@ class SheepController extends Controller
      */
     public function show(Sheep $sheep)
     {
-        // Muat relasi yang diperlukan untuk tampilan
-        $sheep->load(['shelter', 'mother', 'father']);
+        $sheep->load(['shelter', 'mother', 'father', 'partner']);
 
-        // 1. PANGGIL SERVICE REKOMENDASI HARGA
         $recommender = new PriceRecommenderService();
         $priceData = $recommender->calculate($sheep);
 
-        // 2. Ambil Data Timbangan (Paginate: 5 per halaman)
         $weightRecords = $sheep->weightRecords()
                                ->orderByDesc('weighing_date')
                                ->orderByDesc('id')
                                ->paginate(5, ['*'], 'weight_page');
 
-        // 3. Ambil Data Kesehatan (Paginate: 5 per halaman)
         $healthRecords = $sheep->healthRecords()
                                ->with('symptoms')
-                               ->orderBy('record_date', 'desc')
-                               ->orderBy('id', 'desc')
+                               ->orderByDesc('record_date')
+                               ->orderByDesc('id')
                                ->paginate(5, ['*'], 'health_page');
 
-        // Kirim data harga ke view
         return view('sheep.show', compact('sheep', 'weightRecords', 'healthRecords', 'priceData'));
     }
 
@@ -129,12 +123,12 @@ class SheepController extends Controller
     public function edit(Sheep $sheep)
     {
         $shelters = Shelter::orderBy('name')->get();
+        $partners = User::orderBy('name')->get(['id', 'name']);
         $potential_dams = Sheep::where('gender', 'Betina')->where('id', '!=', $sheep->id)->get(['id', 'tag_number']);
         $potential_sires = Sheep::where('gender', 'Jantan')->where('id', '!=', $sheep->id)->get(['id', 'tag_number']);
-
         $tagSuffix = str_replace('JAS-', '', $sheep->tag_number);
 
-        return view('sheep.edit', compact('sheep', 'shelters', 'potential_dams', 'potential_sires', 'tagSuffix'));
+        return view('sheep.edit', compact('sheep', 'shelters', 'partners', 'potential_dams', 'potential_sires', 'tagSuffix'));
     }
 
     /**
@@ -144,19 +138,49 @@ class SheepController extends Controller
     {
         $data = $request->validated();
 
-        // Logika update foto (jika ada foto baru)
         if ($request->hasFile('photo')) {
             if ($sheep->photo_path) {
                 Storage::disk('public')->delete($sheep->photo_path);
             }
-
             $path = $request->file('photo')->store('sheep_photos', 'public');
             $data['photo_path'] = $path;
         }
 
         $sheep->update($data);
 
-        // Redirect ke halaman show (detail)
         return redirect()->route('sheep.show', $sheep)->with('success', 'Data domba berhasil diperbarui.');
+    }
+
+    /**
+     * Cetak Kartu Ternak (PDF)
+     */
+    public function printCard(Sheep $sheep)
+    {
+        $sheep->load(['shelter', 'mother', 'father', 'healthRecords', 'weightRecords']);
+
+        $data = [
+            'sheep' => $sheep,
+            'farm_name' => 'JAS Farm Sinergi',
+            'print_date' => now()->format('d F Y'),
+        ];
+
+        $pdf = Pdf::loadView('sheep.print_card', $data);
+        $pdf->setPaper('a4', 'portrait');
+
+        return $pdf->stream('Kartu_Ternak_' . $sheep->tag_number . '.pdf');
+    }
+
+    /**
+     * Menghapus data domba.
+     */
+    public function destroy(Sheep $sheep)
+    {
+        if ($sheep->photo_path) {
+            Storage::disk('public')->delete($sheep->photo_path);
+        }
+
+        $sheep->delete();
+
+        return redirect()->route('sheep.index')->with('success', 'Data domba berhasil dihapus.');
     }
 }
