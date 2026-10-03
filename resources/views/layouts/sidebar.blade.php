@@ -5,8 +5,6 @@
     @php
         $pendingReqCount = 0;
         if(Auth::check() && Auth::user()->role === 'mitra') {
-            // Hitung request yang statusnya 'pending' untuk user ini
-            // Menggunakan try-catch agar tidak error jika tabel belum dimigrasi
             try {
                 $pendingReqCount = \App\Models\PlacementRequest::where('target_partner_id', Auth::id())
                     ->where('status', 'pending')
@@ -19,7 +17,7 @@
 
     <style>
         .custom-scrollbar::-webkit-scrollbar {
-            width: 5px;
+            width: 6px;
         }
 
         .custom-scrollbar::-webkit-scrollbar-track {
@@ -27,45 +25,73 @@
         }
 
         .custom-scrollbar::-webkit-scrollbar-thumb {
-            background-color: #e5e7eb;
+            background: linear-gradient(to bottom, #10b981, #059669);
             border-radius: 20px;
         }
 
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background-color: #d1d5db;
+            background: linear-gradient(to bottom, #059669, #047857);
         }
 
         .custom-scrollbar {
             scrollbar-width: thin;
-            scrollbar-color: #e5e7eb transparent;
+            scrollbar-color: #10b981 transparent;
+        }
+
+        /* Smooth animation for nav links */
+        .nav-link {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-link::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 4px;
+            background: linear-gradient(to bottom, #10b981, #059669);
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+        }
+
+        .nav-link.active::before {
+            transform: translateX(0);
         }
     </style>
 
     <!-- HEADER: Logo & Tombol Close -->
-    <div class="flex items-center justify-between h-16 px-4 border-b border-gray-100 shrink-0">
+    <div class="flex items-center justify-between h-16 px-4 border-b border-gray-100 shrink-0 bg-gradient-to-r from-green-50 to-emerald-50">
 
         <!-- Logo Group -->
-        <a href="{{ route('dashboard') }}" class="flex items-center gap-2">
-            <img src="{{ asset('img/logo.png') }}" alt="Logo JAS Farm" class="object-contain w-10 h-10"
-                onerror="this.style.display='none'">
-            <span class="text-xl font-bold text-gray-800">JAS Farm</span>
+        <a href="{{ route('dashboard') }}" class="flex items-center gap-2 transition-transform duration-200 hover:scale-105">
+            <div class="flex items-center justify-center w-10 h-10 rounded-lg shadow-lg bg-gradient-to-br">
+                <img src="{{ asset('img/logo.png') }}" alt="Logo JAS Farm" class="object-contain w-16 h-16"
+                    onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <span class="hidden text-xl text-white">🐑</span>
+            </div>
+            <div>
+                <span class="text-lg font-bold text-gray-800">JAS Farm</span>
+                <p class="text-xs font-medium text-green-600">Smart Farming</p>
+            </div>
         </a>
 
         <!-- Tombol Close (Mobile) -->
         <button @click="sidebarOpen = false"
-            class="p-1 text-gray-500 transition-colors rounded-md lg:hidden hover:bg-gray-100 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            class="p-2 text-gray-500 transition-all duration-200 rounded-lg lg:hidden hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-green-500">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
             </svg>
         </button>
     </div>
 
     <!-- Menu Utama -->
-    <nav class="flex-1 px-4 py-4 space-y-1 overflow-y-auto custom-scrollbar">
+    <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto custom-scrollbar">
 
         {{-- DASHBOARD (Semua User) --}}
         <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')"
-            class="flex items-center px-4 py-2 text-gray-600 rounded-md hover:bg-gray-100 hover:text-gray-800 {{ request()->routeIs('dashboard') ? 'bg-indigo-50 text-indigo-700' : '' }}">
+            class="nav-link flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 {{ request()->routeIs('dashboard') ? 'active bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800' }}">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z">
@@ -75,8 +101,9 @@
         </x-nav-link>
 
         {{-- GRUP 1: MANAJEMEN TERNAK / ASET --}}
-        <div class="pt-4 pb-2">
-            <p class="px-4 text-xs font-semibold tracking-wider text-gray-400 uppercase">
+        <div class="pt-5 pb-2">
+            <p class="flex items-center gap-2 px-4 text-xs font-bold tracking-wider text-gray-500 uppercase">
+                <span class="w-8 h-px bg-gradient-to-r from-gray-300 to-transparent"></span>
                 {{ Auth::user()->role === 'mitra' ? 'Aset Saya' : 'Manajemen Ternak' }}
             </p>
         </div>
@@ -84,7 +111,7 @@
         {{-- Permintaan Masuk (KHUSUS MITRA) --}}
         @if (Auth::user()->role === 'mitra')
             <x-nav-link :href="route('placement-requests.index')" :active="request()->routeIs('placement-requests.*')"
-                class="flex items-center justify-between px-4 py-2 text-gray-600 rounded-md hover:bg-gray-100 hover:text-gray-800 {{ request()->routeIs('placement-requests.*') ? 'bg-indigo-50 text-indigo-700' : '' }}">
+                class="nav-link flex items-center justify-between px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 {{ request()->routeIs('placement-requests.*') ? 'active bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800' }}">
                 <div class="flex items-center">
                     <span class="mr-3 text-xl">📥</span>
                     <span>{{ __('Permintaan Masuk') }}</span>
@@ -92,7 +119,7 @@
 
                 {{-- BADGE NOTIFIKASI --}}
                 @if($pendingReqCount > 0)
-                    <span class="flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full animate-pulse">
+                    <span class="flex items-center justify-center min-w-[24px] h-6 px-2 text-xs font-bold text-white bg-gradient-to-r from-red-500 to-red-600 rounded-full shadow-lg animate-pulse">
                         {{ $pendingReqCount }}
                     </span>
                 @endif
@@ -101,103 +128,108 @@
 
         {{-- Data Domba (SEMUA USER) --}}
         <x-nav-link :href="route('sheep.index')" :active="request()->routeIs('sheep.*')"
-            class="flex items-center px-4 py-2 text-gray-600 rounded-md hover:bg-gray-100 hover:text-gray-800 {{ request()->routeIs('sheep.*') ? 'bg-indigo-50 text-indigo-700' : '' }}">
+            class="nav-link flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 {{ request()->routeIs('sheep.*') ? 'active bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800' }}">
             <span class="mr-3 text-xl">🐑</span>
             {{ __('Data Domba') }}
         </x-nav-link>
 
         {{-- Lokasi Kandang (SEMUA USER) --}}
         <x-nav-link :href="route('shelters.index')" :active="request()->routeIs('shelters.*')"
-            class="flex items-center px-4 py-2 text-gray-600 rounded-md hover:bg-gray-100 hover:text-gray-800 {{ request()->routeIs('shelters.*') ? 'bg-indigo-50 text-indigo-700' : '' }}">
+            class="nav-link flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 {{ request()->routeIs('shelters.*') ? 'active bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800' }}">
             <span class="mr-3 text-xl">🏠</span>
             {{ __('Lokasi Kandang') }}
         </x-nav-link>
 
         {{-- Pakan Harian (SEMUA USER) --}}
         <x-nav-link :href="route('feeding-records.index')" :active="request()->routeIs('feeding-records.*')"
-            class="flex items-center px-4 py-2 text-gray-600 rounded-md hover:bg-gray-100 hover:text-gray-800 {{ request()->routeIs('feeding-records.*') ? 'bg-indigo-50 text-indigo-700' : '' }}">
+            class="nav-link flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 {{ request()->routeIs('feeding-records.*') ? 'active bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800' }}">
             <span class="mr-3 text-xl">🍽️</span>
             {{ __('Pakan Harian') }}
         </x-nav-link>
 
-        {{-- Jenis Pakan (SEMUA USER - SUDAH DIPINDAHKAN) --}}
-
-
-        <div class="pt-4 pb-2">
-            <p class="px-4 text-xs font-semibold tracking-wider text-gray-400 uppercase">Data Master</p>
+        {{-- GRUP 2: DATA MASTER --}}
+        <div class="pt-5 pb-2">
+            <p class="flex items-center gap-2 px-4 text-xs font-bold tracking-wider text-gray-500 uppercase">
+                <span class="w-8 h-px bg-gradient-to-r from-gray-300 to-transparent"></span>
+                Data Master
+            </p>
         </div>
 
         <x-nav-link :href="route('feed-types.index')" :active="request()->routeIs('feed-types.*')"
-            class="flex items-center px-4 py-2 text-gray-600 rounded-md hover:bg-gray-100 hover:text-gray-800 {{ request()->routeIs('feed-types.*') ? 'bg-indigo-50 text-indigo-700' : '' }}">
+            class="nav-link flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 {{ request()->routeIs('feed-types.*') ? 'active bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800' }}">
             <span class="mr-3 text-xl">🌾</span>
             {{ __('Jenis Pakan') }}
         </x-nav-link>
 
         <x-nav-link :href="route('symptoms.index')" :active="request()->routeIs('symptoms.*')"
-            class="flex items-center px-4 py-2 text-gray-600 rounded-md hover:bg-gray-100 hover:text-gray-800 {{ request()->routeIs('symptoms.*') ? 'bg-indigo-50 text-indigo-700' : '' }}">
+            class="nav-link flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 {{ request()->routeIs('symptoms.*') ? 'active bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800' }}">
             <span class="mr-3 text-xl">🩺</span>
             {{ __('Data Gejala') }}
         </x-nav-link>
 
-        <div class="pt-4 pb-2">
-            <p class="px-4 text-xs font-semibold tracking-wider text-gray-400 uppercase">Keuangan</p>
+        {{-- GRUP 3: KEUANGAN --}}
+        <div class="pt-5 pb-2">
+            <p class="flex items-center gap-2 px-4 text-xs font-bold tracking-wider text-gray-500 uppercase">
+                <span class="w-8 h-px bg-gradient-to-r from-gray-300 to-transparent"></span>
+                Keuangan
+            </p>
         </div>
 
         <x-nav-link :href="route('profit-loss.index')" :active="request()->routeIs('profit-loss.*')"
-            class="flex items-center px-4 py-2 text-gray-600 rounded-md hover:bg-gray-100 hover:text-gray-800 {{ request()->routeIs('profit-loss.*') ? 'bg-indigo-50 text-indigo-700' : '' }}">
+            class="nav-link flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 {{ request()->routeIs('profit-loss.*') ? 'active bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800' }}">
             <span class="mr-3 text-xl">💰</span>
             {{ __('Arus Kas') }}
         </x-nav-link>
 
-        {{-- GRUP 2: ADMIN & STAFF AREA --}}
-        @if (Auth::user()->role !== 'mitra')
+        {{-- GRUP 4: ADMIN AREA (Hanya Admin) --}}
+        @if (Auth::user()->role === 'admin')
+            <div class="pt-5 pb-2">
+                <p class="flex items-center gap-2 px-4 text-xs font-bold tracking-wider text-gray-500 uppercase">
+                    <span class="w-8 h-px bg-gradient-to-r from-gray-300 to-transparent"></span>
+                    Admin Area
+                </p>
+            </div>
 
-            {{-- KEUANGAN (Hanya Admin) --}}
+            {{-- Manajemen User --}}
+            <x-nav-link :href="route('users.index')" :active="request()->routeIs('users.*')"
+                class="nav-link flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 {{ request()->routeIs('users.*') ? 'active bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800' }}">
+                <span class="mr-3 text-xl">👥</span>
+                {{ __('Manajemen User') }}
+            </x-nav-link>
 
-            {{-- ADMIN ONLY --}}
-            @if (Auth::user()->role === 'admin')
-                <div class="pt-4 pb-2">
-                    <p class="px-4 text-xs font-semibold tracking-wider text-gray-400 uppercase">Admin Area</p>
-                </div>
-
-                {{-- Manajemen User --}}
-                <x-nav-link :href="route('users.index')" :active="request()->routeIs('users.*')"
-                    class="flex items-center px-4 py-2 text-gray-600 rounded-md hover:bg-gray-100 hover:text-gray-800 {{ request()->routeIs('users.*') ? 'bg-indigo-50 text-indigo-700' : '' }}">
-                    <span class="mr-3 text-xl">👥</span>
-                    {{ __('Manajemen User') }}
-                </x-nav-link>
-
-                {{-- Kemitraan --}}
-                <x-nav-link :href="route('partners.index')" :active="request()->routeIs('partners.*')"
-                    class="flex items-center px-4 py-2 text-gray-600 rounded-md hover:bg-gray-100 hover:text-gray-800 {{ request()->routeIs('partners.*') ? 'bg-indigo-50 text-indigo-700' : '' }}">
-                    <span class="mr-3 text-xl">🤝</span>
-                    {{ __('Data Mitra') }}
-                </x-nav-link>
-            @endif
-
+            {{-- Kemitraan --}}
+            <x-nav-link :href="route('partners.index')" :active="request()->routeIs('partners.*')"
+                class="nav-link flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 {{ request()->routeIs('partners.*') ? 'active bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800' }}">
+                <span class="mr-3 text-xl">🤝</span>
+                {{ __('Data Mitra') }}
+            </x-nav-link>
         @endif
     </nav>
 
     <!-- FOOTER: User Profile & Logout -->
-    <div class="p-4 border-t border-gray-200 bg-gray-50 shrink-0">
+    <div class="p-4 border-t border-gray-200 bg-gradient-to-r from-gray-50 to-green-50 shrink-0">
         <a href="{{ route('profile.edit') }}"
-            class="flex items-center gap-3 p-2 mb-3 transition-colors rounded-md hover:bg-gray-100 group"
+            class="flex items-center gap-3 p-3 mb-3 transition-all duration-200 rounded-xl hover:bg-white hover:shadow-md group"
             title="Edit Profil">
             <div
-                class="flex items-center justify-center w-8 h-8 font-bold text-indigo-600 transition-colors bg-indigo-100 rounded-full group-hover:bg-indigo-200">
+                class="flex items-center justify-center w-10 h-10 font-bold text-white transition-all duration-200 rounded-full shadow-md bg-gradient-to-br from-green-500 to-emerald-600 group-hover:shadow-lg group-hover:scale-110">
                 {{ substr(Auth::user()->name, 0, 1) }}
             </div>
-            <div class="overflow-hidden">
-                <p class="text-sm font-medium text-gray-900 truncate transition-colors group-hover:text-indigo-700">
-                    {{ Auth::user()->name }}</p>
-                <p class="w-32 text-xs text-gray-500 uppercase truncate">{{ Auth::user()->role }}</p>
+            <div class="flex-1 overflow-hidden">
+                <p class="text-sm font-bold text-gray-900 truncate transition-colors group-hover:text-green-700">
+                    {{ Auth::user()->name }}
+                </p>
+                <p class="text-xs font-medium text-green-600 uppercase truncate">{{ Auth::user()->role }}</p>
             </div>
+            <svg class="w-4 h-4 text-gray-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
         </a>
         <form method="POST" action="{{ route('logout') }}">
             @csrf
             <button type="submit"
-                class="flex items-center justify-center w-full px-4 py-2 text-sm text-red-600 transition-colors rounded-md bg-red-50 hover:bg-red-100">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                class="flex items-center justify-center w-full gap-2 px-4 py-3 text-sm font-bold text-red-600 transition-all duration-200 rounded-xl bg-red-50 hover:bg-red-100 hover:shadow-md">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
                     </path>

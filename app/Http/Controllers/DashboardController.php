@@ -96,6 +96,7 @@ class DashboardController extends Controller
             ->limit(5) // Ambil 5 kategori terbesar
             ->get();
 
+
         $expenseLabels = $expenseCategories->pluck('category');
         $expenseTotals = $expenseCategories->pluck('total');
 

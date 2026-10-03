@@ -2,14 +2,15 @@ import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 
 export default defineConfig({
-    //    server: {
-    //        host: '0.0.0.0',
-    //        port: 5173,
-    //        hmr: {
-    //            host: 'qf87jg0z-8000.asse.devtunnels.ms',
-    //            protocol: 'wss',
-    //        },
-    //    },
+    server: {
+        host: '0.0.0.0',
+        port: 5173,
+        hmr: {
+            host: 'nkxd7lq1-5173.asse.devtunnels.ms',
+            protocol: 'wss',
+            clientPort: 443,
+        },
+    },
     plugins: [
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.js'],
